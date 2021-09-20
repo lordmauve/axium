@@ -1,3 +1,4 @@
+from hashlib import sha256
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
@@ -6,6 +7,8 @@ from pygame import joystick
 import pygame.mixer
 import random
 from math import tau, pi
+from functools import partial
+from itertools import combinations
 
 import sfx
 
@@ -21,6 +24,11 @@ scene = w2d.Scene(1280, 720, title="Axium")
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 
 coro = w2d.clock.coro
+
+
+particles = scene.layers[1].add_particle_group(max_age=1, drag=0.5)
+particles.add_color_stop(0, (1, 1, 1, 1))
+particles.add_color_stop(1, (0, 0, 0, 0))
 
 
 # The set of objects the Threx would like to attack
@@ -46,10 +54,118 @@ Reactor()
 
 
 
+class CollisionGroup:
+    def __init__(self):
+        self.objects = []
+        self.dead = set()
+        self.types = {}
+        self.handlers = {}
+
+    def add_handler(self, type_a, type_b, func):
+        self.handlers[type_a, type_b] = func
+
+    def handler(self, type_a, type_b):
+        """Decorator to register a handler for some types"""
+        def dec(func):
+            self.add_handler(type_a, type_b, func)
+        return dec
+
+    def track(self, obj, type):
+        self.objects.append(obj)
+        self.types[obj] = type
+
+    def untrack(self, obj):
+        self.dead.add(obj)
+        self.types.pop(obj, None)
+
+    def find_collisions(self):
+        self.objects = [o for o in self.objects if o not in self.dead]
+        self.dead.clear()
+
+        if not self.objects:
+            return
+
+        self.objects.sort(
+            key=lambda o: (o.x - o.radius, o.y - o.radius)
+        )
+
+        def collisions_axis(objects, left, right, collisions_y):
+            it = iter(objects)
+            o = next(it)
+            found = [o]
+            mark = right(o)
+            for o in it:
+                if left(o) < mark:
+                    found.append(o)
+                else:
+                    if len(found) > 1:
+                        yield from collisions_y(found)
+                    found.clear()
+                mark = max(mark, right(o))
+            if len(found) == len(objects):
+                yield found
+            elif len(found) > 1:
+                yield from collisions_y(found)
+
+        collisions_x = partial(
+            collisions_axis,
+            left=lambda o: o.x - o.radius,
+            right=lambda o: o.x + o.radius,
+            collisions_y=lambda objects: collisions_y(objects)
+        )
+        collisions_y = partial(
+            collisions_axis,
+            left=lambda o: o.y - o.radius,
+            right=lambda o: o.y + o.radius,
+            collisions_y=collisions_x
+        )
+
+        for group in collisions_x(self.objects):
+            for a, b in combinations(group, 2):
+                sep = a.pos - b.pos
+                if sep.length() < a.radius + b.radius:
+                    yield a, b
+
+    def process_collisions(self):
+        for a, b in self.find_collisions():
+            types = self.types[a], self.types[b]
+            handler = self.handlers.get(types)
+            if handler:
+                handler(a, b)
+                continue
+
+            handler = self.handlers.get(types[::-1])
+            if handler:
+                handler(b, a)
+
+
+colgroup = CollisionGroup()
+
+@colgroup.handler('ship', 'threx_shot')
+def handle_collision(ship, shot):
+    particles.emit(50, pos=ship.pos, vel=ship.vel, vel_spread=50)
+    ship.nursery.cancel()
+    shot.delete()
+    colgroup.untrack(shot)
+
+
+@colgroup.handler('threx', 'bullet')
+def handle_collision(threx, bullet):
+    particles.emit(50, pos=threx.pos, vel=threx.vel, vel_spread=50, color='red')
+    threx.nursery.cancel()
+    bullet.delete()
+    colgroup.untrack(bullet)
+
+
 def read_joy() -> vec2:
     jx = stick.get_axis(0)
     jy = stick.get_axis(1)
-    return vec2(jx, jy)
+    v = vec2(jx, jy)
+    length = v.length() * 1.05
+    length = min(1, length ** 2)
+    if length < 0.1:
+        length = 0
+    return v.scaled_to(length)
 
 
 async def bullet(ship):
@@ -61,9 +177,16 @@ async def bullet(ship):
         pos=pos,
         angle=ship.angle,
     )
+    shot.radius = 12
+    colgroup.track(shot, 'bullet')
+
     async for dt in coro.frames_dt(seconds=3):
+        if not shot.is_alive():
+            break
         shot.pos += vel * dt
-    shot.delete()
+    else:
+        shot.delete()
+    colgroup.untrack(shot)
 
 
 async def joy_press(*buttons):
@@ -109,13 +232,19 @@ async def threx_shoot(ship):
     sfx.enemy_laser.play()
     vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
-    shot = w2d.Group([
-        scene.layers[1].add_sprite('threx_bullet1'),
-        scene.layers[1].add_sprite('threx_bullet2'),
-    ],
+    shot = w2d.Group(
+        [
+            scene.layers[1].add_sprite('threx_bullet1'),
+            scene.layers[1].add_sprite('threx_bullet2'),
+        ],
         pos=pos
     )
-    async for dt in coro.frames_dt():
+    shot.radius = 8
+    colgroup.track(shot, 'threx_bullet')
+
+    async for dt in coro.frames_dt(seconds=2):
+        if not shot:
+            break
         shot.pos += vel * dt
         shot[0].angle += 4 * dt
         shot[1].angle -= 2 * dt
@@ -124,7 +253,12 @@ async def threx_shoot(ship):
 
 async def do_threx(bullet_nursery):
     """Coroutine to run an enemy ship."""
-    ship = scene.layers[0].add_sprite('threx')
+    pos = vec2(
+        random.uniform(-200, 200),
+        random.uniform(-200, 200),
+    )
+
+    ship = scene.layers[0].add_sprite('threx', pos=pos)
     ship.radius = 10
     ship.vel = vec2(250, 0)
     ship.rudder = 0
@@ -165,7 +299,6 @@ async def do_threx(bullet_nursery):
                 ship.rudder = random.choice((1, -1))
                 await coro.sleep(0.2)
 
-
     async def shoot():
         while True:
             async for dt in coro.frames_dt():
@@ -176,9 +309,13 @@ async def do_threx(bullet_nursery):
             await coro.sleep(1)
 
     async with w2d.Nursery() as ns:
+        ship.nursery = ns
+        colgroup.track(ship, 'threx')
         ns.do(drive())
         ns.do(steer())
         ns.do(shoot())
+    colgroup.untrack(ship)
+    ship.delete()
 
 
 async def do_life():
@@ -209,6 +346,8 @@ async def do_life():
             await coro.sleep(0.1)
 
     async with w2d.Nursery() as ns:
+        ship.nursery = ns
+        colgroup.track(ship, 'ship')
         ns.do(drive_ship())
         ns.do(shoot())
 
@@ -225,11 +364,17 @@ async def screenshot():
         await joy_release(button)
 
 
+async def collisions():
+    async for _ in coro.frames():
+        colgroup.process_collisions()
+
+
 async def main():
     for _ in range(3):
         async with w2d.Nursery() as game:
             game.do(do_life())
             game.do(screenshot())
+            game.do(collisions())
             for _ in range(3):
                 game.do(do_threx(game))
 
