@@ -27,6 +27,25 @@ coro = w2d.clock.coro
 targets = set()
 
 
+class Reactor:
+    radius = 60
+
+    def __init__(self, pos=vec2(0, 0)):
+        self.sprite = w2d.Group(
+            [
+                scene.layers[-1].add_sprite('component_base'),
+                scene.layers[1].add_sprite('reactor'),
+            ],
+            pos=pos
+        )
+        self.pos = pos
+        targets.add(self)
+
+
+Reactor()
+
+
+
 def read_joy() -> vec2:
     jx = stick.get_axis(0)
     jy = stick.get_axis(1)
@@ -51,6 +70,14 @@ async def joy_press(*buttons):
     """Wait until one of the given buttons is pressed."""
     while True:
         ev = await w2d.next_event(pygame.JOYBUTTONDOWN)
+        if not buttons or ev.button in buttons:
+            return ev
+
+
+async def joy_release(*buttons):
+    """Wait until one of the given buttons is pressed."""
+    while True:
+        ev = await w2d.next_event(pygame.JOYBUTTONUP)
         if not buttons or ev.button in buttons:
             return ev
 
@@ -98,6 +125,7 @@ async def threx_shoot(ship):
 async def do_threx(bullet_nursery):
     """Coroutine to run an enemy ship."""
     ship = scene.layers[0].add_sprite('threx')
+    ship.radius = 10
     ship.vel = vec2(250, 0)
     ship.rudder = 0
     t = trail(ship, color='red', stroke_width=1)
@@ -133,7 +161,7 @@ async def do_threx(bullet_nursery):
                 ship.rudder = 0
 
             sep = target.pos - ship.pos
-            if sep.length() < 100:
+            if sep.length() < 100 + target.radius:
                 ship.rudder = random.choice((1, -1))
                 await coro.sleep(0.2)
 
@@ -155,6 +183,7 @@ async def do_threx(bullet_nursery):
 
 async def do_life():
     ship = scene.layers[0].add_sprite('ship')
+    ship.radius = 12
     targets.add(ship)
 
     async def drive_ship():
@@ -187,10 +216,20 @@ async def do_life():
     targets.remove(ship)
 
 
+async def screenshot():
+    """Take screenshots when the player presses the Start button."""
+    button = 11
+    while True:
+        await joy_press(button)
+        scene.screenshot()
+        await joy_release(button)
+
+
 async def main():
     for _ in range(3):
         async with w2d.Nursery() as game:
             game.do(do_life())
+            game.do(screenshot())
             for _ in range(3):
                 game.do(do_threx(game))
 
