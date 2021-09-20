@@ -85,11 +85,8 @@ class CollisionGroup:
         if not self.objects:
             return
 
-        self.objects.sort(
-            key=lambda o: (o.x - o.radius, o.y - o.radius)
-        )
-
         def collisions_axis(objects, left, right, collisions_y):
+            objects.sort(key=left)
             it = iter(objects)
             o = next(it)
             found = [o]
@@ -100,7 +97,7 @@ class CollisionGroup:
                 else:
                     if len(found) > 1:
                         yield from collisions_y(found)
-                    found.clear()
+                    found = [o]
                 mark = max(mark, right(o))
             if len(found) == len(objects):
                 yield found
@@ -177,7 +174,7 @@ async def bullet(ship):
         pos=pos,
         angle=ship.angle,
     )
-    shot.radius = 12
+    shot.radius = 20
     colgroup.track(shot, 'bullet')
 
     async for dt in coro.frames_dt(seconds=3):
@@ -239,7 +236,7 @@ async def threx_shoot(ship):
         ],
         pos=pos
     )
-    shot.radius = 8
+    shot.radius = 12
     colgroup.track(shot, 'threx_bullet')
 
     async for dt in coro.frames_dt(seconds=2):
@@ -259,7 +256,7 @@ async def do_threx(bullet_nursery):
     )
 
     ship = scene.layers[0].add_sprite('threx', pos=pos)
-    ship.radius = 10
+    ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
     t = trail(ship, color='red', stroke_width=1)
