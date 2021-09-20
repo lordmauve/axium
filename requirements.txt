@@ -1,0 +1,4 @@
+pygame==2.0.1
+wasabi2d
+wasabi-geom
+pyfxr
