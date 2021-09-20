@@ -1,7 +1,7 @@
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
-import pyfxr
+import pygame
 from pygame import joystick
 import pygame.mixer
 
@@ -15,7 +15,7 @@ DECEL = 0.1
 ACCEL = 1000
 BULLET_SPEED = 700  # px/s
 
-scene = w2d.Scene(1280, 720)
+scene = w2d.Scene(1280, 720, title="Axium")
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 
 
@@ -37,6 +37,14 @@ async def bullet(ship):
     async for dt in w2d.clock.coro.frames_dt(seconds=3):
         shot.pos += vel * dt
     shot.delete()
+
+
+async def joy_press(*buttons):
+    """Wait until one of the given buttons is pressed."""
+    while True:
+        ev = await w2d.next_event(pygame.JOYBUTTONDOWN)
+        if not buttons or ev.button in buttons:
+            return ev
 
 
 async def do_life():
@@ -65,10 +73,10 @@ async def do_life():
             ])
 
     async def shoot():
-        async for _ in w2d.clock.coro.frames():
-            if stick.get_button(0):
-                ns.do(bullet(ship))
-                await w2d.clock.coro.sleep(0.1)
+        while True:
+            await joy_press(0)
+            ns.do(bullet(ship))
+            await w2d.clock.coro.sleep(0.1)
 
     async with w2d.Nursery() as ns:
         ns.do(drive_ship())
