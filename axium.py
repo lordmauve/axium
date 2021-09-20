@@ -1,4 +1,6 @@
 from hashlib import sha256
+from typing import Tuple
+from numpy.lib.nanfunctions import nansum
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
@@ -8,7 +10,9 @@ import pygame.mixer
 import random
 from math import tau, pi
 from functools import partial
-from itertools import combinations
+from itertools import combinations, count
+from typing import Iterable, Tuple
+from contextlib import contextmanager
 
 import sfx
 
@@ -22,6 +26,8 @@ BULLET_SPEED = 700  # px/s
 
 scene = w2d.Scene(1280, 720, title="Axium")
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
+hud = scene.layers[5]
+hud.is_hud = True
 
 coro = w2d.clock.coro
 
@@ -55,30 +61,33 @@ Reactor()
 
 
 class CollisionGroup:
+    """Find object collisions using a sort-and-sweep broad phase."""
+
     def __init__(self):
         self.objects = []
         self.dead = set()
         self.types = {}
         self.handlers = {}
 
-    def add_handler(self, type_a, type_b, func):
+    def add_handler(self, type_a: str, type_b: str, func):
+        """Register an object"""
         self.handlers[type_a, type_b] = func
 
-    def handler(self, type_a, type_b):
+    def handler(self, type_a: str, type_b: str):
         """Decorator to register a handler for some types"""
         def dec(func):
             self.add_handler(type_a, type_b, func)
         return dec
 
-    def track(self, obj, type):
+    def track(self, obj: object, type: str):
         self.objects.append(obj)
         self.types[obj] = type
 
-    def untrack(self, obj):
+    def untrack(self, obj: object):
         self.dead.add(obj)
         self.types.pop(obj, None)
 
-    def find_collisions(self):
+    def find_collisions(self) -> Iterable[Tuple[object, object]]:
         self.objects = [o for o in self.objects if o not in self.dead]
         self.dead.clear()
 
@@ -125,7 +134,11 @@ class CollisionGroup:
 
     def process_collisions(self):
         for a, b in self.find_collisions():
-            types = self.types[a], self.types[b]
+            try:
+                types = self.types[a], self.types[b]
+            except KeyError:
+                # One or other object has probably been deleted in the handler
+                continue
             handler = self.handlers.get(types)
             if handler:
                 handler(a, b)
@@ -155,6 +168,7 @@ def handle_collision(threx, bullet):
 
 
 def read_joy() -> vec2:
+    """Get a vector representing the joystick input."""
     jx = stick.get_axis(0)
     jy = stick.get_axis(1)
     v = vec2(jx, jy)
@@ -256,6 +270,7 @@ async def do_threx(bullet_nursery):
     )
 
     ship = scene.layers[0].add_sprite('threx', pos=pos)
+    mark = hud.add_sprite('radarmark')
     ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
@@ -279,6 +294,14 @@ async def do_threx(bullet_nursery):
             ship.pos += ship.vel * dt
             ship.angle = ship.vel.angle()
             next(t)
+            cam = scene.camera.pos
+            off = (ship.pos - cam)
+            if off.length() > 360:
+                mark.pos = off.scaled_to(300)
+                mark.angle = off.angle()
+                mark.color = (1, 1, 1, 1)
+            else:
+                mark.color = (0, 0, 0, 0)
 
     async def steer():
         async for dt in coro.frames_dt():
@@ -312,6 +335,7 @@ async def do_threx(bullet_nursery):
         ns.do(steer())
         ns.do(shoot())
     colgroup.untrack(ship)
+    mark.delete()
     ship.delete()
 
 
@@ -366,14 +390,45 @@ async def collisions():
         colgroup.process_collisions()
 
 
+@contextmanager
+def showing(obj):
+    try:
+        yield obj
+    finally:
+        obj.delete()
+
+
+async def show_title(text):
+    label = hud.add_label(
+        text,
+        font='sector_034',
+        align="center",
+        fontsize=36,
+        pos=(0, 0),
+        color=(0, 0, 0, 0)
+    )
+    label.scale = 0.2
+    await w2d.animate(label, duration=0.3, scale=1.0, y=-200, color=(1, 1, 1, 1))
+    await coro.sleep(3)
+    await w2d.animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
+    label.delete()
+
+
+async def wave(wave_num):
+    await show_title(f"Begining wave {wave_num}")
+    async with w2d.Nursery() as ns:
+        for _ in range(wave_num):
+            ns.do(do_threx(ns))
+    await coro.sleep(5)
+
+
 async def main():
-    for _ in range(3):
-        async with w2d.Nursery() as game:
-            game.do(do_life())
-            game.do(screenshot())
-            game.do(collisions())
-            for _ in range(3):
-                game.do(do_threx(game))
+    async with w2d.Nursery() as game:
+        game.do(do_life())
+        game.do(screenshot())
+        game.do(collisions())
+        for wave_num in count(1):
+            await wave(wave_num)
 
 
 w2d.run(main())
