@@ -1,8 +1,11 @@
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
-
+import pyfxr
 from pygame import joystick
+import pygame.mixer
+
+import sfx
 
 joystick.init()
 stick = joystick.Joystick(0)
@@ -10,9 +13,9 @@ stick = joystick.Joystick(0)
 # Ship deceleration
 DECEL = 0.1
 ACCEL = 1000
-BULLET_SPEED = 1000  # px/s
+BULLET_SPEED = 700  # px/s
 
-scene = w2d.Scene()
+scene = w2d.Scene(1280, 720)
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 
 
@@ -23,8 +26,9 @@ def read_joy() -> vec2:
 
 
 async def bullet(ship):
-    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle)
-    pos = ship.pos + vec2(30, 0).rotated(ship.angle)
+    sfx.laser.play()
+    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
+    pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = scene.layers[1].add_sprite(
         'tripleshot',
         pos=pos,
@@ -40,11 +44,11 @@ async def do_life():
     trail = scene.layers[1].add_line(
         [ship.pos] * 50,
         color=(0.6, 0.8, 1.0, 0.6),
-        stroke_width=4,
+        stroke_width=3,
     )
 
     async def drive_ship():
-        vel = vec2(0, 0)
+        vel = ship.vel = vec2(0, 0)
         async for dt in w2d.clock.coro.frames_dt():
             ship.pos += vel * dt
             scene.camera.pos = ship.pos
@@ -52,8 +56,9 @@ async def do_life():
             if vel.length_squared() > 10:
                 ship.angle = vel.angle()
             vel = vel * (DECEL ** dt) + read_joy() * ACCEL * dt
+            ship.vel = vel
 
-            stern = ship.pos + vec2(-20, 0).rotated(ship.angle)
+            stern = ship.pos + vec2(-10, 0).rotated(ship.angle)
             trail.vertices = np.vstack([
                 [stern],
                 trail.vertices[:-1]
