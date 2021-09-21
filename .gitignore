@@ -2,3 +2,5 @@
 *.pyc
 screenshot_*
 video_*
+*.zip
+/particles/

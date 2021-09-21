@@ -32,9 +32,29 @@ hud.is_hud = True
 coro = w2d.clock.coro
 
 
-particles = scene.layers[1].add_particle_group(max_age=1, drag=0.5)
-particles.add_color_stop(0, (1, 1, 1, 1))
-particles.add_color_stop(1, (0, 0, 0, 0))
+smoke = scene.layers[1].add_particle_group(
+    max_age=3,
+    drag=0.1,
+    spin_drag=0.5,
+    grow=2,
+    texture='smoke_04'
+)
+smoke.add_color_stop(0, (0.3, 0.3, 0.3, 1))
+smoke.add_color_stop(1, (0, 0, 0, 1))
+smoke.add_color_stop(3, (0, 0, 0, 0))
+
+flame = scene.layers[1].add_particle_group(
+    max_age=1,
+    drag=0.5,
+    spin_drag=0.5,
+    grow=3,
+    texture='smoke_04'
+)
+flame.add_color_stop(0, (2, 2, 0.2, 1))
+flame.add_color_stop(0.2, (1, 0.3, 0.0, 1))
+flame.add_color_stop(0.5, (0, 0, 0.0, 1))
+flame.add_color_stop(1, (0, 0, 0, 0))
+
 
 
 # The set of objects the Threx would like to attack
@@ -80,12 +100,29 @@ class CollisionGroup:
         return dec
 
     def track(self, obj: object, type: str):
+        """Start tracking collisions for an object.
+
+        The object should have .pos and .radius attributes.
+        """
         self.objects.append(obj)
         self.types[obj] = type
 
     def untrack(self, obj: object):
+        """Stop tracking collisions for an object.
+
+        This is a no-op if the object is already untracked.
+        """
         self.dead.add(obj)
         self.types.pop(obj, None)
+
+    @contextmanager
+    def tracking(self, obj: object, type: str):
+        """Track an object for collisions within the context."""
+        self.track(obj, type)
+        try:
+            yield
+        finally:
+            self.untrack(obj)
 
     def find_collisions(self) -> Iterable[Tuple[object, object]]:
         self.objects = [o for o in self.objects if o not in self.dead]
@@ -153,7 +190,7 @@ colgroup = CollisionGroup()
 
 @colgroup.handler('ship', 'threx_shot')
 def handle_collision(ship, shot):
-    particles.emit(50, pos=ship.pos, vel=ship.vel, vel_spread=50)
+    explode(pos=ship.pos, vel=ship.vel)
     ship.nursery.cancel()
     shot.delete()
     colgroup.untrack(shot)
@@ -161,10 +198,52 @@ def handle_collision(ship, shot):
 
 @colgroup.handler('threx', 'bullet')
 def handle_collision(threx, bullet):
-    particles.emit(50, pos=threx.pos, vel=threx.vel, vel_spread=50, color='red')
+    explode(threx.pos, threx.vel)
     threx.nursery.cancel()
     bullet.delete()
     colgroup.untrack(bullet)
+
+
+def explode(pos, vel):
+    smoke.emit(
+        50,
+        pos=pos,
+        vel=vel * 0.6,
+        vel_spread=100,
+        angle_spread=3,
+        spin_spread=5,
+        age_spread=0.3,
+        size=12
+    )
+
+    async def trail():
+        emitter = flame.add_emitter(
+            pos=pos,
+            rate=100,
+            size=6,
+            pos_spread=3,
+            vel_spread=10,
+            spin_spread=5,
+            emit_angle_spread=3,
+        )
+        emitter_vel = vec2(
+            random.uniform(-200, 200),
+            random.uniform(-200, 200),
+        ) + vel * 0.6
+        emitter_accel = vec2(
+            random.uniform(-200, 200),
+            random.uniform(-200, 200),
+        )
+        with showing(emitter):
+            async for dt in coro.frames_dt(seconds=random.uniform(0.5, 1.0)):
+                emitter_vel += emitter_accel * dt
+                emitter.pos += emitter_vel * dt
+                emitter.rate -= 1
+                if emitter.rate == 0:
+                    break
+
+    for _ in range(random.randint(2, 5)):
+        game.do(trail())
 
 
 def read_joy() -> vec2:
@@ -172,8 +251,7 @@ def read_joy() -> vec2:
     jx = stick.get_axis(0)
     jy = stick.get_axis(1)
     v = vec2(jx, jy)
-    length = v.length() * 1.05
-    length = min(1, length ** 2)
+    length = min(1, v.length() * 1.05)
     if length < 0.1:
         length = 0
     return v.scaled_to(length)
@@ -237,6 +315,11 @@ def trail(obj, color='white', stroke_width=2):
             ])
     finally:
         trail.delete()
+
+
+async def run_trail(trail):
+    async for _ in coro.frames_dt():
+        next(trail)
 
 
 async def threx_shoot(ship):
@@ -355,7 +438,7 @@ async def do_life():
                 ship.angle = vel.angle()
 
             vel = vel * (DECEL ** dt) + read_joy() * ACCEL * dt
-            if stick.get_button(1):
+            if stick.get_button(1) and vel.length_squared() > 9:
                 vel = vel.scaled_to(600)
             ship.vel = vel
             next(t)
@@ -366,11 +449,11 @@ async def do_life():
             ns.do(bullet(ship))
             await coro.sleep(0.1)
 
-    async with w2d.Nursery() as ns:
-        ship.nursery = ns
-        colgroup.track(ship, 'ship')
-        ns.do(drive_ship())
-        ns.do(shoot())
+    with colgroup.tracking(ship, 'ship'):
+        async with w2d.Nursery() as ns:
+            ship.nursery = ns
+            ns.do(drive_ship())
+            ns.do(shoot())
 
     ship.delete()
     targets.remove(ship)
@@ -392,6 +475,7 @@ async def collisions():
 
 @contextmanager
 def showing(obj):
+    """Delete an object after the context."""
     try:
         yield obj
     finally:
@@ -419,10 +503,11 @@ async def wave(wave_num):
     async with w2d.Nursery() as ns:
         for _ in range(wave_num):
             ns.do(do_threx(ns))
-    await coro.sleep(5)
+    await coro.sleep(1)
 
 
 async def main():
+    global game
     async with w2d.Nursery() as game:
         game.do(do_life())
         game.do(screenshot())
