@@ -8,11 +8,11 @@ import pygame
 from pygame import joystick
 import pygame.mixer
 import random
-from math import tau, pi
+from math import e, tau, pi
 from functools import partial
 from itertools import combinations, count
 from typing import Iterable, Tuple
-from contextlib import contextmanager
+from contextlib import asynccontextmanager, contextmanager
 
 import sfx
 
@@ -205,8 +205,9 @@ def handle_collision(threx, bullet):
 
 
 def explode(pos, vel):
+    scene.camera.screen_shake(10)
     smoke.emit(
-        50,
+        20,
         pos=pos,
         vel=vel * 0.6,
         vel_spread=100,
@@ -219,7 +220,7 @@ def explode(pos, vel):
     async def trail():
         emitter = flame.add_emitter(
             pos=pos,
-            rate=100,
+            rate=200,
             size=6,
             pos_spread=3,
             vel_spread=10,
@@ -227,9 +228,9 @@ def explode(pos, vel):
             emit_angle_spread=3,
         )
         emitter_vel = vec2(
-            random.uniform(-200, 200),
-            random.uniform(-200, 200),
-        ) + vel * 0.6
+            random.uniform(-100, 100),
+            random.uniform(-100, 100),
+        ) + vel
         emitter_accel = vec2(
             random.uniform(-200, 200),
             random.uniform(-200, 200),
@@ -238,8 +239,8 @@ def explode(pos, vel):
             async for dt in coro.frames_dt(seconds=random.uniform(0.5, 1.0)):
                 emitter_vel += emitter_accel * dt
                 emitter.pos += emitter_vel * dt
-                emitter.rate -= 1
-                if emitter.rate == 0:
+                emitter.rate *= 0.7 ** dt
+                if emitter.rate < 1:
                     break
 
     for _ in range(random.randint(2, 5)):
@@ -353,7 +354,7 @@ async def do_threx(bullet_nursery):
     )
 
     ship = scene.layers[0].add_sprite('threx', pos=pos)
-    mark = hud.add_sprite('radarmark')
+    mark = hud.add_sprite('radarmark', color='red')
     ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
@@ -482,6 +483,7 @@ def showing(obj):
         obj.delete()
 
 
+@asynccontextmanager
 async def show_title(text):
     label = hud.add_label(
         text,
@@ -493,13 +495,74 @@ async def show_title(text):
     )
     label.scale = 0.2
     await w2d.animate(label, duration=0.3, scale=1.0, y=-200, color=(1, 1, 1, 1))
-    await coro.sleep(3)
+    yield
     await w2d.animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
     label.delete()
 
 
+async def play(sound_name):
+    snd = w2d.sounds.load(sound_name)
+    snd.play()
+    try:
+        await coro.sleep(snd.get_length())
+    except:
+        snd.stop()
+        raise
+
+
+number_names = {
+    1: 'one',
+    2: 'two',
+    3: 'three',
+    4: 'four',
+    5: 'five',
+    6: 'six',
+    7: 'seven',
+    8: 'eight',
+    9: 'nine',
+    10: 'ten',
+    11: 'eleven',
+    12: 'twelve',
+    13: 'thirteen',
+    14: 'fourteen',
+    15: 'fifteen',
+    16: 'sixteen',
+    17: 'seventeen',
+    18: 'eighteen',
+    19: 'nineteen',
+    20: 'twenty',
+    30: 'thirty',
+    40: 'forty',
+    50: 'fifty',
+    60: 'sixty',
+    70: 'seventy',
+    80: 'eighty',
+    90: 'ninety',
+}
+
+def spell(n):
+    if n <= 20:
+        yield number_names[n]
+    elif n < 100:
+        tens, n = divmod(n, 10)
+        yield number_names[tens * 10]
+        if n:
+            yield number_names[n]
+    elif n < 1000:
+        hundreds, tens = divmod(n, 100)
+        yield number_names[hundreds]
+        yield 'hundred'
+        if tens:
+            yield 'and'
+            yield from spell(tens)
+
+
 async def wave(wave_num):
-    await show_title(f"Begining wave {wave_num}")
+    async with show_title(f"Begining wave {wave_num}"):
+        await play('beginning_wave')
+        for sound in spell(wave_num):
+            await play(sound)
+
     async with w2d.Nursery() as ns:
         for _ in range(wave_num):
             ns.do(do_threx(ns))
