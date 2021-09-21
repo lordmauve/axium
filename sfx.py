@@ -19,6 +19,7 @@ laser = Sound(buffer=pyfxr.SFX(
     pha_ramp=-0.132,
     wave_type=pyfxr.WaveType.SQUARE,
 ))
+laser.set_volume(0.5)
 
 enemy_laser = Sound(buffer=pyfxr.SFX(
     base_freq=0.46,
@@ -31,4 +32,18 @@ enemy_laser = Sound(buffer=pyfxr.SFX(
     env_decay=0.145,
     env_punch=0.043,
     wave_type=pyfxr.WaveType.SQUARE,
+))
+enemy_laser.set_volume(0.5)
+
+explosion = Sound(buffer=pyfxr.SFX(
+    base_freq=0.06,
+    freq_ramp=-0.011,
+    env_attack=0.16,
+    env_sustain=0.31,
+    env_decay=0.67,
+    env_punch=0.19,
+    lpf_resonance=0.0,
+    lpf_freq=0.31,
+    lpf_ramp=-0.15,
+    wave_type=pyfxr.WaveType.NOISE,
 ))

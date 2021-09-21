@@ -205,6 +205,7 @@ def handle_collision(threx, bullet):
 
 
 def explode(pos, vel):
+    sfx.explosion.play()
     scene.camera.screen_shake(10)
     smoke.emit(
         20,
@@ -383,7 +384,7 @@ async def do_threx(bullet_nursery):
             if off.length() > 360:
                 mark.pos = off.scaled_to(300)
                 mark.angle = off.angle()
-                mark.color = (1, 1, 1, 1)
+                mark.color = 'red'
             else:
                 mark.color = (0, 0, 0, 0)
 
