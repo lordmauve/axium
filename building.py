@@ -30,9 +30,15 @@ async def star_bit(pos):
     star.collected = False
 
     async def flash():
-        while star.is_alive():
+        for _ in range(2):
             await w2d.animate(star, color=(0.6, 0.6, 1.0, 1.0))
             await w2d.animate(star, color=(1.0, 1.0, 1.0, 1.0))
+        for _ in range(6):
+            star.color = (0, 0, 0, 0)
+            await w2d.clock.coro.sleep(0.2)
+            star.color = (0.6, 0.6, 1.0, 1.0)
+            await w2d.clock.coro.sleep(0.3)
+        ns.cancel()
 
     async def move():
         vel = random_vec2(50)
@@ -393,8 +399,11 @@ class Arsenal:
 @colgroup.handler('ship', 'rocket_pack')
 def handle_collect(ship, powerup):
     powerup.event.set()
-    ship.weapon = 'rocket'
-    ship.weapon_count = 3
+    if ship.weapon != 'rocket':
+        ship.weapon = 'rocket'
+        ship.weapon_count = 3
+    else:
+        ship.weapon_count += 3
     sfx.powerup.play()
 
 

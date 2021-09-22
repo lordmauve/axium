@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 
 import numpy as np
+import wasabi2d as w2d
 from wasabigeom import vec2
 
 

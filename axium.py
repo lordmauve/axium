@@ -23,7 +23,7 @@ ACCEL = 2000
 BULLET_SPEED = 700  # px/s
 ROCKET_SPEED = 400  # px/s
 
-scene = building.scene = w2d.Scene(1280, 720, title="Axium")
+scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=False)
 #scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
@@ -143,15 +143,11 @@ async def bullet(ship):
         angle=ship.angle,
     )
     shot.radius = 20
-    colgroup.track(shot, 'bullet')
-
-    async for dt in coro.frames_dt(seconds=3):
-        if not shot.is_alive():
-            break
-        shot.pos += vel * dt
-    else:
-        shot.delete()
-    colgroup.untrack(shot)
+    with colgroup.tracking(shot, 'bullet'), showing(shot):
+        async for dt in coro.frames_dt(seconds=3):
+            if not shot.is_alive():
+                break
+            shot.pos += vel * dt
 
 
 async def rocket(ship):
@@ -244,15 +240,13 @@ async def threx_shoot(ship):
         pos=pos
     )
     shot.radius = 12
-    colgroup.track(shot, 'threx_bullet')
-
-    async for dt in coro.frames_dt(seconds=2):
-        if not shot:
-            break
-        shot.pos += vel * dt
-        shot[0].angle += 4 * dt
-        shot[1].angle -= 2 * dt
-    shot.delete()
+    with colgroup.tracking(shot, 'threx_bullet'), showing(shot):
+        async for dt in coro.frames_dt(seconds=2):
+            if not shot:
+                break
+            shot.pos += vel * dt
+            shot[0].angle += 4 * dt
+            shot[1].angle -= 2 * dt
 
 
 def angle_to(target, from_obj) -> float:
@@ -325,15 +319,12 @@ async def do_threx(bullet_nursery):
             bullet_nursery.do(threx_shoot(ship))
             await coro.sleep(1)
 
-    async with w2d.Nursery() as ns:
-        ship.nursery = ns
-        colgroup.track(ship, 'threx')
-        ns.do(drive())
-        ns.do(steer())
-        ns.do(shoot())
-    colgroup.untrack(ship)
-    mark.delete()
-    ship.delete()
+    with colgroup.tracking(ship, 'threx'), showing(ship), showing(mark):
+        async with w2d.Nursery() as ns:
+            ship.nursery = ns
+            ns.do(drive())
+            ns.do(steer())
+            ns.do(shoot())
 
 
 async def do_life():
@@ -373,13 +364,12 @@ async def do_life():
             elif ev.button == 3:
                 await building.building_mode(ship, game)
 
-    with colgroup.tracking(ship, 'ship'):
+    with colgroup.tracking(ship, 'ship'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(drive_ship())
             ns.do(shoot())
 
-    ship.delete()
     targets.remove(ship)
 
 
@@ -422,7 +412,7 @@ async def wave(wave_num):
 
     async with w2d.Nursery() as ns:
         for _ in range(wave_num + 1):
-            ns.do(do_threx(ns))
+            ns.do(do_threx(game))
     await coro.sleep(1)
 
 
