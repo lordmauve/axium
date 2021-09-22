@@ -282,7 +282,12 @@ class Reactor:
             s.color = (1, 1, 1, 0)
             w2d.animate(s, duration=0.3, color=(1, 1, 1, 1))
         reactor.scale = 2.0
-        w2d.animate(reactor, scale=1.0, tween='decelerate')
+        w2d.animate(
+            reactor,
+            scale=1.0,
+            tween='decelerate',
+            angle=random.choice((6, -6))
+        )
         base.scale = 0.5
         w2d.animate(base, scale=1.0, tween='decelerate')
 
