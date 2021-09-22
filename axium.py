@@ -1,6 +1,4 @@
 from hashlib import sha256
-from typing import Tuple
-from numpy.lib.nanfunctions import nansum
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
@@ -8,20 +6,16 @@ import pygame
 from pygame import joystick
 import pygame.mixer
 import random
-from math import e, tau, pi
-from functools import partial
-from itertools import combinations, count
-from typing import Iterable, Tuple
-from contextlib import asynccontextmanager, contextmanager
+from math import tau, pi
+from itertools import count
+from contextlib import asynccontextmanager
 
 import sfx
 import building
 from helpers import showing, random_vec2
 from collisions import colgroup
+from controllers import stick, read_joy, joy_press, joy_release
 
-
-joystick.init()
-stick = joystick.Joystick(0)
 
 # Ship deceleration
 DECEL = 0.01
@@ -29,6 +23,8 @@ ACCEL = 2000
 BULLET_SPEED = 700  # px/s
 
 scene = building.scene = w2d.Scene(1280, 720, title="Axium")
+#scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
+
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 hud = scene.layers[5]
 hud.is_hud = True
@@ -63,9 +59,6 @@ flame.add_color_stop(1, (0, 0, 0, 0))
 
 # The set of objects the Threx would like to attack
 targets = set()
-
-
-targets.add(building.Reactor())
 
 
 
@@ -125,16 +118,6 @@ def explode(pos, vel):
         game.do(trail())
 
 
-def read_joy() -> vec2:
-    """Get a vector representing the joystick input."""
-    jx = stick.get_axis(0)
-    jy = stick.get_axis(1)
-    v = vec2(jx, jy)
-    length = min(1, v.length() * 1.05)
-    if length < 0.1:
-        length = 0
-    return v.scaled_to(length)
-
 
 async def bullet(ship):
     sfx.laser.play()
@@ -157,22 +140,6 @@ async def bullet(ship):
     colgroup.untrack(shot)
 
 
-async def joy_press(*buttons):
-    """Wait until one of the given buttons is pressed."""
-    while True:
-        ev = await w2d.next_event(pygame.JOYBUTTONDOWN)
-        if not buttons or ev.button in buttons:
-            return ev
-
-
-async def joy_release(*buttons):
-    """Wait until one of the given buttons is pressed."""
-    while True:
-        ev = await w2d.next_event(pygame.JOYBUTTONUP)
-        if not buttons or ev.button in buttons:
-            return ev
-
-
 def trail(obj, color='white', stroke_width=2):
     trail = scene.layers[1].add_line(
         [obj.pos] * 50,
@@ -188,10 +155,14 @@ def trail(obj, color='white', stroke_width=2):
         while True:
             yield
             stern = obj.pos + vec2(-10, 0).rotated(obj.angle)
-            trail.vertices = np.vstack([
-                [stern],
-                trail.vertices[:-1]
-            ])
+            verts = trail.vertices
+            verts[0] = stern
+            verts[1:] = verts[:-1]
+            trail.vertices = verts
+            # trail.vertices = np.vstack([
+            #     [stern],
+            #     trail.vertices[:-1]
+            # ])
     finally:
         trail.delete()
 
@@ -238,7 +209,10 @@ async def do_threx(bullet_nursery):
     ship.rudder = 0
     t = trail(ship, color='red', stroke_width=1)
 
-    target = random.choice(list(targets))
+    if random.randrange(5) > 0 and building.base.objects:
+        target = random.choice(building.base.objects)
+    else:
+        target = random.choice(list(targets))
 
     def angle_to(obj) -> float:
         sep = target.pos - ship.pos
@@ -324,9 +298,12 @@ async def do_life():
 
     async def shoot():
         while True:
-            await joy_press(0)
-            ns.do(bullet(ship))
-            await coro.sleep(0.1)
+            ev = await joy_press(0, 3)
+            if ev.button == 0:
+                ns.do(bullet(ship))
+                await coro.sleep(0.1)
+            elif ev.button == 3:
+                await building.building_mode(ship)
 
     with colgroup.tracking(ship, 'ship'):
         async with w2d.Nursery() as ns:
@@ -367,8 +344,6 @@ async def show_title(text):
     yield
     await w2d.animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
     label.delete()
-
-
 
 
 async def wave(wave_num):

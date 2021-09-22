@@ -22,7 +22,7 @@ laser = Sound(buffer=pyfxr.SFX(
     pha_ramp=-0.132,
     wave_type=pyfxr.WaveType.SQUARE,
 ))
-laser.set_volume(0.5)
+laser.set_volume(0.1)
 
 enemy_laser = Sound(buffer=pyfxr.SFX(
     base_freq=0.46,
@@ -36,7 +36,7 @@ enemy_laser = Sound(buffer=pyfxr.SFX(
     env_punch=0.043,
     wave_type=pyfxr.WaveType.SQUARE,
 ))
-enemy_laser.set_volume(0.5)
+enemy_laser.set_volume(0.1)
 
 explosion = Sound(buffer=pyfxr.SFX(
     base_freq=0.06,
@@ -50,6 +50,7 @@ explosion = Sound(buffer=pyfxr.SFX(
     lpf_ramp=-0.15,
     wave_type=pyfxr.WaveType.NOISE,
 ))
+explosion.set_volume(0.4)
 
 
 async def play(sound_name):
@@ -118,5 +119,5 @@ def pickup():
         env_punch=0.468,
         arp_mod=0.253,
     ))
-    snd.set_volume(0.3)
+    snd.set_volume(0.2)
     snd.play()

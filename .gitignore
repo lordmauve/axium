@@ -4,3 +4,5 @@ screenshot_*
 video_*
 *.zip
 /particles/
+script.txt
+TODO.md
