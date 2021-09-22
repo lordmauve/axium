@@ -53,6 +53,21 @@ explosion = Sound(buffer=pyfxr.SFX(
 ))
 explosion.set_volume(0.4)
 
+powerup = Sound(buffer=pyfxr.SFX(
+    base_freq=0.241,
+    freq_ramp=0.16,
+    vib_strength=0.33,
+    vib_speed=0.51,
+    env_attack=0.0,
+    env_sustain=0.08,
+    env_decay=0.46,
+    pha_offset=0.01,
+    arp_speed=0.28,
+    arp_mod=0.0,
+    wave_type=pyfxr.WaveType.SQUARE,
+))
+powerup.set_volume(0.3)
+
 
 @lru_cache
 def placement(n):

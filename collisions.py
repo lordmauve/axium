@@ -12,10 +12,12 @@ class CollisionGroup:
         self.dead = set()
         self.types = {}
         self.handlers = {}
+        self.type_names = set()
 
     def add_handler(self, type_a: str, type_b: str, func):
         """Register an object"""
         self.handlers[type_a, type_b] = func
+        self.type_names.update((type_a, type_b))
 
     def handler(self, type_a: str, type_b: str):
         """Decorator to register a handler for some types"""
@@ -28,6 +30,8 @@ class CollisionGroup:
 
         The object should have .pos and .radius attributes.
         """
+        assert type in self.type_names, \
+            f"No collision handlers for {type}"
         self.objects.append(obj)
         self.types[obj] = type
 
@@ -47,6 +51,19 @@ class CollisionGroup:
             yield
         finally:
             self.untrack(obj)
+
+    def test(self, pos, radius, type) -> list[object]:
+        """Find objects within the given radius around pos."""
+        found = []
+        rsquare = radius * radius
+        for o in self.objects:
+            if self.types.get(o) != type:
+                continue
+
+            r = o.radius
+            if (o.pos - pos).length_squared() < (rsquare + r * r):
+                found.append(o)
+        return found
 
     def find_collisions(self) -> Iterable[Tuple[object, object]]:
         self.objects = [o for o in self.objects if o not in self.dead]
@@ -76,14 +93,14 @@ class CollisionGroup:
 
         collisions_x = partial(
             collisions_axis,
-            left=lambda o: o.x - o.radius,
-            right=lambda o: o.x + o.radius,
+            left=lambda o: o.pos.x - o.radius,
+            right=lambda o: o.pos.x + o.radius,
             collisions_y=lambda objects: collisions_y(objects)
         )
         collisions_y = partial(
             collisions_axis,
-            left=lambda o: o.y - o.radius,
-            right=lambda o: o.y + o.radius,
+            left=lambda o: o.pos.y - o.radius,
+            right=lambda o: o.pos.y + o.radius,
             collisions_y=collisions_x
         )
 

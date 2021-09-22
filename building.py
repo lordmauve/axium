@@ -1,6 +1,7 @@
 from typing import Type, TypeVar, NamedTuple
 from itertools import product, count
 from enum import Enum
+import math
 
 import numpy as np
 import wasabi2d as w2d
@@ -83,6 +84,12 @@ class Connection(NamedTuple):
     @property
     def cell(self):
         return self.x, self.y
+
+
+@colgroup.handler('threx_bullet', 'building')
+def handle_collect(bullet, building):
+    bullet.delete()
+    # TODO: damage
 
 
 class Base:
@@ -282,14 +289,113 @@ class Reactor:
             s.color = (1, 1, 1, 0)
             w2d.animate(s, duration=0.3, color=(1, 1, 1, 1))
         reactor.scale = 2.0
-        w2d.animate(
+        base.scale = 0.5
+        w2d.animate(base, scale=1.0, tween='decelerate')
+        await w2d.animate(
             reactor,
             scale=1.0,
             tween='decelerate',
             angle=random.choice((6, -6))
         )
-        base.scale = 0.5
-        w2d.animate(base, scale=1.0, tween='decelerate')
+        colgroup.track(self, 'building')
+
+
+class Arsenal:
+    """An armory that produces a pack of rockets."""
+    radius = 30
+
+    def __init__(self, pos=vec2(0, 0)):
+        parts = [
+            scene.layers[-1].add_sprite('arsenal'),
+            scene.layers[-1].add_sprite('radar', pos=(-53, -53)),
+        ]
+        self.blinkenlights = [
+            scene.layers[-1].add_sprite(
+                'blinkenlight',
+                color='black',
+                pos=(-54, 55 - 16 * i)
+            )
+            for i in range(5)
+        ]
+        self.sprite = w2d.Group(
+            parts + self.blinkenlights,
+            pos=pos
+        )
+        self.pos = pos
+        self.nursery = w2d.Nursery()
+        self.collected = w2d.Event()
+
+    async def run_radar(self):
+        radar = self.sprite[1]
+        while True:
+            da = random.uniform(1, -1)
+            await w2d.animate(
+                radar,
+                tween='accel_decel',
+                angle=radar.angle + da
+            )
+            await w2d.clock.coro.sleep(3)
+
+    async def run_blinkenlights(self):
+        ON_COLOR = (0.3, 0.3, 1.0, 1.0)
+        OFF_COLOR = (0, 0, 0, 1.0)
+        while True:
+            for b in self.blinkenlights:
+                for _ in range(5):
+                    await w2d.animate(b, duration=0.5, color=ON_COLOR)
+                    await w2d.animate(b, duration=0.5, color=OFF_COLOR)
+                await w2d.animate(b, duration=0.5, color=ON_COLOR)
+
+            powerup = scene.layers[0].add_sprite('rocket_pack', pos=self.pos)
+            powerup.radius = 20
+            powerup.event = self.collected
+            with colgroup.tracking(powerup, 'rocket_pack'), \
+                    showing(powerup):
+                await self.collected
+                self.collected = w2d.Event()
+                for b in self.blinkenlights:
+                    b.color = OFF_COLOR
+
+    async def build(self, base):
+        self.sprite.scale = 0.3
+        rot = random.randint(-2, 2) * (math.pi / 2)
+        self.sprite.angle = rot
+        await w2d.animate(self.sprite,
+            scale=1,
+            duration=0.3,
+            tween='decelerate'
+        )
+        if rot:
+            await w2d.clock.coro.sleep(0.2)
+            await w2d.animate(self.sprite,
+                scale=0.8,
+                duration=0.1,
+                tween='decelerate'
+            )
+            await w2d.animate(
+                self.sprite,
+                angle=0,
+                duration=0.2,
+                tween='accel_decel'
+            )
+            await w2d.animate(
+                self.sprite,
+                scale=1,
+                duration=0.2,
+                tween='decelerate'
+            )
+        with colgroup.tracking(self, "building"):
+            async with self.nursery:
+                self.nursery.do(self.run_radar())
+                self.nursery.do(self.run_blinkenlights())
+
+
+@colgroup.handler('ship', 'rocket_pack')
+def handle_collect(ship, powerup):
+    powerup.event.set()
+    ship.weapon = 'rocket'
+    ship.weapon_count = 3
+    sfx.powerup.play()
 
 
 def roundto(n, to):
@@ -322,7 +428,7 @@ async def building_mode(ship, construction_ns):
                 point = insertion_point()
                 pos, can_place = base.can_place(point)
                 if can_place:
-                    construction_ns.do(base.place(Reactor, point))
+                    construction_ns.do(base.place(Arsenal, point))
                     ns.cancel()
 
     async def update_reticle():
