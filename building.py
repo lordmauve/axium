@@ -1,5 +1,6 @@
-from typing import Type, TypeVar
+from typing import Type, TypeVar, NamedTuple
 from itertools import product
+from enum import Enum
 
 import numpy as np
 import wasabi2d as w2d
@@ -67,13 +68,30 @@ def manhattan_distance(a: tuple[int, int], b: tuple[int, int]):
 T = TypeVar('T')
 
 
+class Edge(Enum):
+    """Identify an edge of a grid square."""
+
+    RIGHT = 0
+    BOTTOM = 1
+
+
+class Connection(NamedTuple):
+    x: int
+    y: int
+    edge: Edge
+
+    @property
+    def cell(self):
+        return self.x, self.y
+
+
 class Base:
     def __init__(self):
         self._tiles = None
         self.grid = set()
         self.objects = []
-        self.connectors = set()
-        self.wiring = set()
+        self.connectors: set[tuple[int, int]] = set()
+        self.wiring: tuple[int, int, Edge] = set()
 
     @property
     def tiles(self):
@@ -97,6 +115,15 @@ class Base:
         cx, cy = cell
         return product([cx - 1, cx, cx + 1], [cy - 1, cy, cy + 1])
 
+    def wiring_for(self, cell: tuple[int, int]) -> set[Connection]:
+        cx, cy = cell
+        return {
+            Connection(cx - 2, cy, Edge.RIGHT),
+            Connection(cx + 1, cy, Edge.RIGHT),
+            Connection(cx, cy - 2, Edge.BOTTOM),
+            Connection(cx, cy + 1, Edge.BOTTOM),
+        }
+
     def connectors_for(self, cell: tuple[int, int]) -> set[tuple[int, int]]:
         cx, cy = cell
         return {
@@ -106,16 +133,10 @@ class Base:
             (cx, cy + 2),
         }
 
-    def internal_connectors(self, cell: tuple[int, int]) -> set[tuple[int, int]]:
-        cx, cy = cell
-        return {
-            (cx - 1, cy),
-            (cx + 1, cy),
-            (cx, cy - 1),
-            (cx, cy + 1),
-        }
-
-    def lay_connector(self, start_points):
+    def lay_connector(
+            self,
+            start_points: set[tuple[int, int]],
+        ):
         if any(p in self.grid for p in start_points):
             return
 
@@ -129,35 +150,30 @@ class Base:
         )
 
         # Build the path we'd like the connector to follow
-        path = set()
-        ystep = -1 if starty > connecty else 1
-        for y in range(starty, connecty + ystep, ystep):
-            c = startx, y
-            path.add(c)
-            if c in self.wiring:
-                break
-        else:
-            corner = startx, y
-            xstep = -1 if startx > connectx else 1
-            for x in range(startx, connectx + xstep, xstep):
-                c = x, y
-                if c == corner:
-                    continue
-                path.add(c)
-                if c in self.wiring:
-                    break
+        cells = {
+            (startx, starty),
+            (connectx, connecty),
+        }  # the cells we have touched
 
-        # Insert the whole path
-        self.wiring.update(path)
+        for y in range(*sorted((starty, connecty))):
+            c = Connection(startx, y, Edge.BOTTOM)
+            self.wiring.add(c)
+            cells.add(c.cell)
+            cells.add((startx, y + 1))
+        for x in range(*sorted((startx, connectx))):
+            c = Connection(x, connecty, Edge.RIGHT)
+            self.wiring.add(c)
+            cells.add(c.cell)
+            cells.add((x + 1, connecty))
 
         # Update the tile map
         tiles = self.tiles
-        for x, y in path:
+        for x, y in cells:
             adj = (
-                (x - 1, y) in self.wiring,
-                (x + 1, y) in self.wiring,
-                (x, y - 1) in self.wiring,
-                (x, y + 1) in self.wiring,
+                Connection(x - 1, y, Edge.RIGHT) in self.wiring,
+                Connection(x, y, Edge.RIGHT) in self.wiring,
+                Connection(x, y - 1, Edge.BOTTOM) in self.wiring,
+                Connection(x, y, Edge.BOTTOM) in self.wiring,
             )
             tiles[x, y] = self.ADJ_MAP.get(adj, 'connector_lr')
 
@@ -185,14 +201,13 @@ class Base:
         for pos in self.cells_for(cell):
             del self.tiles[pos]
         self.grid.update(self.cells_for(cell))
-        self.wiring.update(self.internal_connectors(cell))
         obj = type(world_pos)
         self.objects.append(obj)
 
+        self.wiring.update(self.wiring_for(cell))
         connectors = self.connectors_for(cell)
         self.lay_connector(connectors)
         self.connectors.update(connectors)
-        self.connectors.difference_update(self.grid)
         return obj
 
 
