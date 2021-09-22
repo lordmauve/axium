@@ -2,6 +2,7 @@ from pygame import mixer
 from pygame.mixer import Sound
 import pyfxr
 import random
+from functools import lru_cache
 
 import wasabi2d as w2d
 
@@ -51,6 +52,21 @@ explosion = Sound(buffer=pyfxr.SFX(
     wave_type=pyfxr.WaveType.NOISE,
 ))
 explosion.set_volume(0.4)
+
+
+@lru_cache
+def placement(n):
+    freq = 0.29 + n * 0.01
+    s = Sound(buffer=pyfxr.SFX(
+        base_freq=freq,
+        freq_ramp=-0.489,
+        env_attack=0.0,
+        env_sustain=0.019,
+        env_decay=0.234,
+        wave_type=pyfxr.WaveType.SAW,
+    ))
+    s.set_volume(0.05)
+    return s
 
 
 async def play(sound_name):

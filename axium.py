@@ -303,7 +303,7 @@ async def do_life():
                 ns.do(bullet(ship))
                 await coro.sleep(0.1)
             elif ev.button == 3:
-                await building.building_mode(ship)
+                await building.building_mode(ship, game)
 
     with colgroup.tracking(ship, 'ship'):
         async with w2d.Nursery() as ns:

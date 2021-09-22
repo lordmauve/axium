@@ -1,5 +1,5 @@
 from typing import Type, TypeVar, NamedTuple
-from itertools import product
+from itertools import product, count
 from enum import Enum
 
 import numpy as np
@@ -30,7 +30,7 @@ async def star_bit(pos):
 
     async def flash():
         while star.is_alive():
-            await w2d.animate(star, color=(0.3, 0.3, 1.0, 1.0))
+            await w2d.animate(star, color=(0.6, 0.6, 1.0, 1.0))
             await w2d.animate(star, color=(1.0, 1.0, 1.0, 1.0))
 
     async def move():
@@ -87,7 +87,7 @@ class Connection(NamedTuple):
 
 class Base:
     def __init__(self):
-        self._tiles = None
+        self._tiles = self._sparks = None
         self.grid = set()
         self.objects = []
         self.connectors: set[tuple[int, int]] = set()
@@ -99,9 +99,26 @@ class Base:
             self._tiles = scene.layers[-1].add_tile_map()
         return self._tiles
 
+    @property
+    def sparks(self):
+        if self._sparks:
+            return self._sparks
+        sparks =  self._sparks = scene.layers[1].add_particle_group(
+            max_age=1,
+            drag=0.01,
+            grow=0.1,
+            texture='twirl_02'
+        )
+        sparks.add_color_stop(0, (0.0, 0.0, 1.0, 1))
+        sparks.add_color_stop(1.0, (1.0, 1.0, 1.0, 0))
+        return sparks
+
     def world_to_cell(self, pos) -> tuple[int, int]:
         x, y = pos
         return round(x / 48), round(y / 48)
+
+    def cell_to_world(self, cell: tuple[int, int]) -> vec2:
+       return vec2(cell) * 48 + vec2(24, 24)
 
     def can_place(self, pos) -> tuple[vec2, bool]:
         cx, cy = self.world_to_cell(pos)
@@ -133,7 +150,7 @@ class Base:
             (cx, cy + 2),
         }
 
-    def lay_connector(
+    async def lay_connector(
             self,
             start_points: set[tuple[int, int]],
         ):
@@ -141,6 +158,7 @@ class Base:
             return
 
         if not self.connectors:
+            self.connectors.update(start_points)
             return
 
         # Find closest connector by manhattan distance
@@ -149,38 +167,67 @@ class Base:
             key=lambda pair: manhattan_distance(*pair)
         )
 
-        # Build the path we'd like the connector to follow
-        cells = {
-            (startx, starty),
-            (connectx, connecty),
-        }  # the cells we have touched
+        self.connectors.update(start_points)
 
-        for y in range(*sorted((starty, connecty))):
+        sleep = w2d.clock.coro.sleep
+        interval = 0.03
+
+        # Build the path we'd like the connector to follow
+        self.update_tile(startx, starty)
+        await sleep(interval)
+
+        def mkrange(a, b):
+            if a < b:
+                return range(a, b)
+            else:
+                return range(a - 1, b - 1, -1)
+
+        sounds = (sfx.placement(n).play() for n in count())
+
+        for y in mkrange(starty, connecty):
             c = Connection(startx, y, Edge.BOTTOM)
             self.wiring.add(c)
-            cells.add(c.cell)
-            cells.add((startx, y + 1))
-        for x in range(*sorted((startx, connectx))):
+            self.update_tile(*c.cell)
+            self.update_tile(startx, y + 1)
+            next(sounds)
+            await sleep(interval)
+        for x in mkrange(startx, connectx):
             c = Connection(x, connecty, Edge.RIGHT)
             self.wiring.add(c)
-            cells.add(c.cell)
-            cells.add((x + 1, connecty))
+            self.update_tile(*c.cell)
+            self.update_tile(x + 1, connecty)
+            next(sounds)
+            await sleep(interval)
 
-        # Update the tile map
-        tiles = self.tiles
-        for x, y in cells:
-            adj = (
-                Connection(x - 1, y, Edge.RIGHT) in self.wiring,
-                Connection(x, y, Edge.RIGHT) in self.wiring,
-                Connection(x, y - 1, Edge.BOTTOM) in self.wiring,
-                Connection(x, y, Edge.BOTTOM) in self.wiring,
-            )
-            tiles[x, y] = self.ADJ_MAP.get(adj, 'connector_lr')
+        self.update_tile(connectx, connecty)
+
+    def update_tile(self, x, y):
+        """Update the tile at the given position."""
+        adj = (
+            Connection(x - 1, y, Edge.RIGHT) in self.wiring,
+            Connection(x, y, Edge.RIGHT) in self.wiring,
+            Connection(x, y - 1, Edge.BOTTOM) in self.wiring,
+            Connection(x, y, Edge.BOTTOM) in self.wiring,
+        )
+        self.tiles[x, y] = self.ADJ_MAP.get(adj, 'connector_lr')
+        self.sparks.emit(
+            10,
+            size=20,
+            pos=self.cell_to_world((x, y)),
+            pos_spread=0,
+            vel_spread=100,
+            age_spread=0.5,
+            angle_spread=3,
+        )
 
     ADJ_MAP = {
         # l, r, u, d
         (1, 1, 0, 0): 'connector_lr',
+        (1, 0, 0, 0): 'connector_lr',
+        (0, 1, 0, 0): 'connector_lr',
         (0, 0, 1, 1): 'connector_ud',
+        (0, 0, 1, 0): 'connector_ud',
+        (0, 0, 0, 1): 'connector_ud',
         (1, 0, 1, 0): 'corner_lu',
         (1, 0, 0, 1): 'corner_ld',
         (0, 1, 1, 0): 'corner_ru',
@@ -190,9 +237,10 @@ class Base:
         (0, 1, 1, 1): 'tee_rud',
         (1, 0, 1, 1): 'tee_lud',
         (1, 1, 1, 1): 'connector_lrud',
+        (0, 0, 0, 0): None,
     }
 
-    def place(self, type: Type[T], pos: vec2) -> T:
+    async def place(self, type: Type[T], pos: vec2) -> T:
         world_pos, can_place = self.can_place(pos)
         if not can_place:
             raise ValueError("Cannot place here")
@@ -206,8 +254,9 @@ class Base:
 
         self.wiring.update(self.wiring_for(cell))
         connectors = self.connectors_for(cell)
-        self.lay_connector(connectors)
-        self.connectors.update(connectors)
+        async with w2d.Nursery() as ns:
+            ns.do(self.lay_connector(connectors))
+            ns.do(obj.build(self))
         return obj
 
 
@@ -227,12 +276,22 @@ class Reactor:
         )
         self.pos = pos
 
+    async def build(self, base):
+        base, reactor = self.sprite
+        for s in self.sprite:
+            s.color = (1, 1, 1, 0)
+            w2d.animate(s, duration=0.3, color=(1, 1, 1, 1))
+        reactor.scale = 2.0
+        w2d.animate(reactor, scale=1.0, tween='decelerate')
+        base.scale = 0.5
+        w2d.animate(base, scale=1.0, tween='decelerate')
+
 
 def roundto(n, to):
     return (n + to / 2) // to * to
 
 
-async def building_mode(ship):
+async def building_mode(ship, construction_ns):
     """Display a reticle where to build the next base object."""
     def insertion_point():
         return ship.pos + vec2(100, 0).rotated(ship.angle)
@@ -258,7 +317,7 @@ async def building_mode(ship):
                 point = insertion_point()
                 pos, can_place = base.can_place(point)
                 if can_place:
-                    base.place(Reactor, point)
+                    construction_ns.do(base.place(Reactor, point))
                     ns.cancel()
 
     async def update_reticle():
