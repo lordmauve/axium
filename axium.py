@@ -26,6 +26,8 @@ BULLET_SPEED = 700  # px/s
 ROCKET_SPEED = 400  # px/s
 
 scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=False)
+scene.viewport.width = 638
+p2vp = scene.viewport.clone(x=642)
 #scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
