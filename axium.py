@@ -26,7 +26,7 @@ ACCEL = 2000
 BULLET_SPEED = 700  # px/s
 ROCKET_SPEED = 400  # px/s
 
-scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=False)
+scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=True)
 #scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
@@ -202,8 +202,7 @@ async def rocket(ship):
     explode(shot.pos, vec2(0, 0))
 
 
-
-def trail(obj, color='white', stroke_width=2):
+async def trail(obj, color='white', stroke_width=2):
     trail = scene.layers[1].add_line(
         [obj.pos] * 50,
         color=color,
@@ -214,21 +213,17 @@ def trail(obj, color='white', stroke_width=2):
     colors[:, 3] = np.linspace(alpha, 0, 50) ** 2
     trail.colors = colors
 
-    try:
-        while True:
-            yield
+    with showing(trail):
+        t = 0
+        async for dt in coro.frames_dt():
             stern = obj.pos + vec2(-10, 0).rotated(obj.angle)
             verts = trail.vertices
             verts[0] = stern
-            verts[1:] = verts[:-1]
+            t += dt
+            if t > 1 / 60:
+                verts[1:] = verts[:-1]
+                t %= 1 / 60
             trail.vertices = verts
-    finally:
-        trail.delete()
-
-
-async def run_trail(trail):
-    async for _ in coro.frames_dt():
-        next(trail)
 
 
 async def threx_shoot(ship):
@@ -272,7 +267,6 @@ async def do_threx(bullet_nursery):
     ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
-    t = trail(ship, color='red', stroke_width=1)
 
     if random.randrange(5) > 0 and building.base.objects:
         target = random.choice(building.base.objects)
@@ -287,7 +281,6 @@ async def do_threx(bullet_nursery):
 
             ship.pos += ship.vel * dt
             ship.angle = ship.vel.angle()
-            next(t)
             cam = scene.camera.pos
             off = (ship.pos - cam)
             if off.length() > 360:
@@ -328,6 +321,7 @@ async def do_threx(bullet_nursery):
             ns.do(drive())
             ns.do(steer())
             ns.do(shoot())
+            ns.do(trail(ship, color='red', stroke_width=1))
 
 
 async def do_life(viewport, controller):
@@ -339,7 +333,6 @@ async def do_life(viewport, controller):
 
     async def drive_ship():
         vel = ship.vel = vec2(0, 0)
-        t = trail(ship, color=(0.6, 0.8, 1.0, 0.9))
         async for dt in coro.frames_dt():
             ship.pos += vel * dt
             viewport.camera.pos = ship.pos
@@ -350,7 +343,6 @@ async def do_life(viewport, controller):
             if controller.b() and vel.length_squared() > 9:
                 vel = vel.scaled_to(600)
             ship.vel = vel
-            next(t)
 
     async def shoot():
         while True:
@@ -371,7 +363,7 @@ async def do_life(viewport, controller):
             ship.nursery = ns
             ns.do(drive_ship())
             ns.do(shoot())
-
+            ns.do(trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
     targets.remove(ship)
 
 
@@ -467,13 +459,9 @@ class Player:
 
 
 async def play_game(nursery):
-    lives = 0
-    first_life = True
+    lives = 3
 
-    pos = vec2(
-        -scene.width // 2 + 20,
-        -scene.height // 2 + 20
-    )
+    pos = vec2(20, 20)
     icons = [
         hud.add_sprite(
             'ship',
@@ -519,7 +507,7 @@ async def play_game(nursery):
         async with w2d.Nursery() as hotplug:
             hotplug.do(wait_for_p2())
 
-    # TODO: destroy base
+    building.base.clear()
 
     nursery.cancel()
 

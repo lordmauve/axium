@@ -108,6 +108,15 @@ class Base:
         self.connectors: set[tuple[int, int]] = set()
         self.wiring: tuple[int, int, Edge] = set()
 
+    def clear(self):
+        for o in self.objects:
+            o.delete()
+        self.grid.clear()
+        self.objects.clear()
+        self.connectors.clear()
+        self.wiring.clear()
+        self._tiles.clear()
+
     @property
     def tiles(self):
         if self._tiles is None:
@@ -291,6 +300,9 @@ class Reactor:
         )
         self.pos = pos
 
+    def delete(self):
+        self.sprite.delete()
+
     async def build(self, base):
         base, reactor = self.sprite
         for s in self.sprite:
@@ -332,6 +344,10 @@ class Arsenal:
         self.pos = pos
         self.nursery = w2d.Nursery()
         self.collected = w2d.Event()
+
+    def delete(self):
+        self.sprite.delete()
+        self.nursery.cancel()
 
     async def run_radar(self):
         radar = self.sprite[1]
