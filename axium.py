@@ -6,7 +6,7 @@ import pygame
 from pygame import joystick
 import pygame.mixer
 import random
-from math import tau, pi
+from math import tau, pi, sin, cos
 from itertools import count
 from contextlib import asynccontextmanager
 
@@ -174,32 +174,29 @@ async def rocket(ship):
         angle=ship.angle,
     )
     shot.radius = 20
-    colgroup.track(shot, 'bullet')
 
     target = None
 
-    async for dt in coro.frames_dt(seconds=2):
-        if not target or not target.is_alive():
-            target = None
-            objs = colgroup.test(shot.pos, 200, 'threx')
-            if objs:
-                target = objs[0]
+    with colgroup.tracking(shot, 'bullet'), showing(shot):
+        async for dt in coro.frames_dt(seconds=2):
+            if not target or not target.is_alive():
+                target = None
+                objs = colgroup.test(shot.pos, 200, 'threx')
+                if objs:
+                    target = objs[0]
 
-        if target:
-            r = angle_to(target, shot)
+            if target:
+                r = angle_to(target, shot)
 
-            if r > 1e-2:
-                vel = vel.rotated(min(r, 10 * dt))
-            elif r < -1e-2:
-                vel = vel.rotated(max(r, -10 * dt))
-            shot.angle = vel.angle()
+                if r > 1e-2:
+                    vel = vel.rotated(min(r, 10 * dt))
+                elif r < -1e-2:
+                    vel = vel.rotated(max(r, -10 * dt))
+                shot.angle = vel.angle()
 
-        if not shot:
-            break
-        shot.pos += vel * dt
-    else:
-        shot.delete()
-    colgroup.untrack(shot)
+            if not shot:
+                break
+            shot.pos += vel * dt
     explode(shot.pos, vec2(0, 0))
 
 
@@ -445,6 +442,7 @@ async def play_game(nursery):
         )
         for i in range(lives)
     ]
+    nursery.do(building.base.place(building.Reactor, vec2(0, 100)))
 
     while lives:
         if not first_life:
@@ -455,17 +453,40 @@ async def play_game(nursery):
         await do_life()
         await coro.sleep(3)
 
+    # TODO: destroy base
+
     nursery.cancel()
+
+
+async def title():
+    title = hud.add_sprite('title', pos=(0, -50))
+    async def orbit():
+        theta = 0
+        async for dt in clocks.ui.coro.frames_dt():
+            theta += 0.1 * dt
+            scene.camera.pos = 200 * vec2(
+                cos(theta * 3),
+                sin(theta * 5)
+            )
+
+    with showing(title):
+        async with w2d.Nursery() as ns:
+            ns.do(orbit())
+            await w2d.next_event(pygame.JOYBUTTONDOWN)
+            ns.cancel()
+        await clocks.ui.animate(scene.camera, duration=0.3, pos=vec2(0, 0))
 
 
 async def main():
     global game
-    async with w2d.Nursery() as game:
-        game.do(play_game(game))
-        game.do(screenshot())
-        game.do(collisions())
-        for wave_num in count(1):
-            await wave(wave_num)
+    while True:
+        await title()
+        async with w2d.Nursery() as game:
+            game.do(play_game(game))
+            game.do(screenshot())
+            game.do(collisions())
+            for wave_num in count(1):
+                await wave(wave_num)
 
 
 w2d.run(main())
