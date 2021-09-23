@@ -72,13 +72,12 @@ flame.add_color_stop(1, (0, 0, 0, 0))
 targets = set()
 
 
-
-# @colgroup.handler('ship', 'threx_bullet')
-# def handle_collision(ship, shot):
-#     explode(pos=ship.pos, vel=ship.vel)
-#     ship.nursery.cancel()
-#     shot.delete()
-#     colgroup.untrack(shot)
+@colgroup.handler('ship', 'threx_bullet')
+def handle_collision(ship, shot):
+    explode(pos=ship.pos, vel=ship.vel)
+    ship.nursery.cancel()
+    shot.delete()
+    colgroup.untrack(shot)
 
 
 @colgroup.handler('threx', 'bullet')
@@ -430,10 +429,40 @@ async def slowmo():
         clocks.game.rate = 1.0
 
 
+async def play_game(nursery):
+    lives = 3
+    first_life = True
+
+    pos = vec2(
+        -scene.width // 2 + 20,
+        -scene.height // 2 + 20
+    )
+    icons = [
+        hud.add_sprite(
+            'ship',
+            pos=pos + vec2(24, 0) * i,
+            angle=-pi / 2
+        )
+        for i in range(lives)
+    ]
+
+    while lives:
+        if not first_life:
+            clocks.ui.animate(bg, duration=0.5, pos=vec2(0, 0))
+            await clocks.ui.animate(scene.camera, duration=0.5, pos=vec2(0, 0))
+        lives -= 1
+        icons.pop().delete()
+        first_life = False
+        await do_life()
+        await coro.sleep(3)
+
+    nursery.cancel()
+
+
 async def main():
     global game
     async with w2d.Nursery() as game:
-        game.do(do_life())
+        game.do(play_game(game))
         game.do(screenshot())
         game.do(collisions())
         for wave_num in count(1):
