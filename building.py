@@ -11,7 +11,6 @@ import random
 import sfx
 from helpers import random_vec2, showing
 from collisions import colgroup
-from controllers import joy_press
 from clocks import coro, animate
 
 scene: w2d.Scene = None
@@ -96,7 +95,8 @@ class Connection(NamedTuple):
 
 @colgroup.handler('threx_bullet', 'building')
 def handle_collect(bullet, building):
-    bullet.delete()
+    pass
+    #bullet.delete()
     # TODO: damage
 
 
@@ -413,7 +413,7 @@ def roundto(n, to):
     return (n + to / 2) // to * to
 
 
-async def building_mode(ship, construction_ns):
+async def building_mode(ship, controller, construction_ns):
     """Display a reticle where to build the next base object."""
     def insertion_point():
         return ship.pos + vec2(100, 0).rotated(ship.angle)
@@ -432,10 +432,10 @@ async def building_mode(ship, construction_ns):
 
     async def process_input():
         while True:
-            ev = await joy_press()
-            if ev.button == 3:
+            button = await controller.button_press('a', 'y')
+            if button == 'y':
                 ns.cancel()
-            elif ev.button == 0:
+            elif button == 'a':
                 point = insertion_point()
                 pos, can_place = base.can_place(point)
                 if can_place:

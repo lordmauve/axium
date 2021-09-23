@@ -9,12 +9,13 @@ import random
 from math import tau, pi, sin, cos
 from itertools import count
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 import sfx
 import building
 from helpers import showing, random_vec2
 from collisions import colgroup
-from controllers import stick, read_joy, joy_press, joy_release
+import controllers
 from clocks import coro, animate
 import clocks
 
@@ -26,14 +27,13 @@ BULLET_SPEED = 700  # px/s
 ROCKET_SPEED = 400  # px/s
 
 scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=False)
-scene.viewport.width = 638
-p2vp = scene.viewport.clone(x=642)
 #scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 scene.layers[-3].parallax = 0.03
-hud = scene.layers[5]
-hud.parallax = 0.0
+
+hudvp = scene.create_viewport()
+hud = hudvp.layers[5]
 
 
 pixels = scene.layers[1].add_particle_group(
@@ -330,8 +330,8 @@ async def do_threx(bullet_nursery):
             ns.do(shoot())
 
 
-async def do_life():
-    ship = scene.layers[0].add_sprite('ship')
+async def do_life(viewport, controller):
+    ship = viewport.layers[0].add_sprite('ship')
     ship.radius = 12
     ship.weapon = 'bullet'
     ship.weapon_count = inf = float('inf')
@@ -342,20 +342,20 @@ async def do_life():
         t = trail(ship, color=(0.6, 0.8, 1.0, 0.9))
         async for dt in coro.frames_dt():
             ship.pos += vel * dt
-            scene.camera.pos = ship.pos
+            viewport.camera.pos = ship.pos
             if vel.length_squared() > 10:
                 ship.angle = vel.angle()
 
-            vel = vel * (DECEL ** dt) + read_joy() * ACCEL * dt
-            if stick.get_button(1) and vel.length_squared() > 9:
+            vel = vel * (DECEL ** dt) + controller.read_stick() * ACCEL * dt
+            if controller.b() and vel.length_squared() > 9:
                 vel = vel.scaled_to(600)
             ship.vel = vel
             next(t)
 
     async def shoot():
         while True:
-            ev = await joy_press(0, 3)
-            if ev.button == 0:
+            button = await controller.button_press('a', 'y')
+            if button == 'a':
                 func = globals()[ship.weapon]
                 ns.do(func(ship))
                 ship.weapon_count -= 1
@@ -363,8 +363,8 @@ async def do_life():
                     ship.weapon = 'bullet'
                     ship.weapon_count = inf
                 await coro.sleep(0.1)
-            elif ev.button == 3:
-                await building.building_mode(ship, game)
+            elif button == 'y':
+                await building.building_mode(ship, controller, game)
 
     with colgroup.tracking(ship, 'ship'), showing(ship):
         async with w2d.Nursery() as ns:
@@ -375,18 +375,50 @@ async def do_life():
     targets.remove(ship)
 
 
-async def screenshot():
+async def screenshot(controller):
     """Take screenshots when the player presses the Start button."""
     button = 11
     while True:
-        await joy_press(button)
+        await controller.button_press('start')
         scene.screenshot()
-        await joy_release(button)
+        await controller.button_release('start')
 
 
 async def collisions():
     async for _ in coro.frames():
         colgroup.process_collisions()
+
+
+@asynccontextmanager
+async def split_screen():
+    vp1, hud = scene.viewports
+    vp1.width -= 12
+    vp2 = scene.viewport.clone(x=scene.width - 10, width=10)
+    scene.viewports = [vp1, vp2, hud]
+    clocks.game.paused = True
+    def split(w):
+        vp1.width = w
+        vp2.x = w
+        vp2.width = max(1, scene.width - w)
+    async for w in clocks.ui.coro.interpolate(
+            scene.width,
+            scene.width // 2,
+            duration=0.5,
+            tween='accel_decel'):
+        split(w)
+    clocks.game.paused = False
+    try:
+        yield vp1, vp2
+    finally:
+        clocks.game.paused = True
+        async for w in clocks.ui.coro.interpolate(
+                scene.width // 2,
+                scene.width,
+                duration=0.5,
+                tween='accel_decel'):
+            split(w)
+        vp2.delete()
+        clocks.game.paused = False
 
 
 @asynccontextmanager
@@ -396,13 +428,13 @@ async def show_title(text):
         font='sector_034',
         align="center",
         fontsize=36,
-        pos=(0, 0),
+        pos=(hudvp.width // 2, 250),
         color=(0, 0, 0, 0)
     )
     label.scale = 0.2
-    await animate(label, duration=0.3, scale=1.0, y=-200, color=(1, 1, 1, 1))
+    await animate(label, duration=0.3, scale=1.0, y=200, color=(1, 1, 1, 1))
     yield
-    await animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
+    await animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=0)
     label.delete()
 
 
@@ -428,8 +460,14 @@ async def slowmo():
         clocks.game.rate = 1.0
 
 
+@dataclass
+class Player:
+    controller: controllers.Controller
+    viewport: w2d.scene.Viewport
+
+
 async def play_game(nursery):
-    lives = 3
+    lives = 0
     first_life = True
 
     pos = vec2(
@@ -446,22 +484,63 @@ async def play_game(nursery):
     ]
     nursery.do(building.base.place(building.Reactor, vec2(0, 100)))
 
-    while lives:
-        if not first_life:
-            await clocks.ui.animate(scene.camera, duration=0.5, pos=vec2(0, 0))
+    def take_life():
+        nonlocal lives
+        if not lives:
+            return False
         lives -= 1
         icons.pop().delete()
-        first_life = False
-        await do_life()
-        await coro.sleep(3)
+        return True
+
+    async def play(viewport, controller):
+        while True:
+            await do_life(viewport, controller)
+            await coro.sleep(3)
+            if not take_life():
+                hotplug.cancel()
+                return
+            await clocks.ui.animate(
+                viewport.camera,
+                duration=0.5,
+                pos=vec2(0, 0)
+            )
+
+    async def player2():
+        async with split_screen() as (_, vp2):
+            await play(vp2, controllers.sticks[1])
+
+    async def wait_for_p2():
+        await controllers.sticks[1].attached
+        await controllers.sticks[1].button_press('start')
+        players.do(player2())
+
+    async with w2d.Nursery() as players:
+        players.do(play(scene.viewport, controllers.sticks[0]))
+        async with w2d.Nursery() as hotplug:
+            hotplug.do(wait_for_p2())
 
     # TODO: destroy base
 
     nursery.cancel()
 
 
+async def joystick_ready():
+    label = hud.add_label(
+        "Please attach a joystick",
+        font='sector_034',
+        align="center",
+        fontsize=25,
+        pos=(hudvp.width // 2, 450),
+        color='white',
+    )
+    with showing(label):
+        await controllers.sticks[0].attached
+
+
 async def title():
-    title = hud.add_sprite('title', pos=(0, -50))
+    title = w2d.Group([
+        hud.add_sprite('title', pos=(hudvp.width // 2, 250)),
+    ])
     async def orbit():
         theta = 0
         async for dt in clocks.ui.coro.frames_dt():
@@ -474,21 +553,34 @@ async def title():
     with showing(title):
         async with w2d.Nursery() as ns:
             ns.do(orbit())
-            await w2d.next_event(pygame.JOYBUTTONDOWN)
+            await joystick_ready()
+            title.append(hud.add_label(
+                "Press start to begin",
+                font='sector_034',
+                align="center",
+                fontsize=25,
+                pos=(hudvp.width // 2, 450),
+                color='white',
+            ))
+
+            await controllers.sticks[0].button_press('start')
             ns.cancel()
         await clocks.ui.animate(scene.camera, duration=0.3, pos=vec2(0, 0))
 
 
 async def main():
     global game
-    while True:
-        await title()
-        async with w2d.Nursery() as game:
-            game.do(play_game(game))
-            game.do(screenshot())
-            game.do(collisions())
-            for wave_num in count(1):
-                await wave(wave_num)
+    async with w2d.Nursery() as services:
+        services.do(controllers.hotplug())
+        while True:
+            stick = await title()
+            async with w2d.Nursery() as game:
+                game.do(play_game(game))
+                game.do(screenshot(controllers.sticks[0]))
+                game.do(collisions())
+                for wave_num in count(1):
+                    await wave(wave_num)
+        services.cancel()
 
 
 w2d.run(main())
