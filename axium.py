@@ -15,6 +15,8 @@ import building
 from helpers import showing, random_vec2
 from collisions import colgroup
 from controllers import stick, read_joy, joy_press, joy_release
+from clocks import coro, animate
+import clocks
 
 
 # Ship deceleration
@@ -30,10 +32,10 @@ bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 hud = scene.layers[5]
 hud.is_hud = True
 
-coro = w2d.clock.coro
 
 pixels = scene.layers[1].add_particle_group(
     max_age=1.5,
+    clock=clocks.game,
 )
 pixels.add_color_stop(0, (1, 1, 1, 1))
 pixels.add_color_stop(1, (1, 1, 1, 1))
@@ -44,7 +46,8 @@ smoke = scene.layers[1].add_particle_group(
     drag=0.1,
     spin_drag=0.5,
     grow=2,
-    texture='smoke_04'
+    texture='smoke_04',
+    clock=clocks.game,
 )
 smoke.add_color_stop(0, (0.3, 0.3, 0.3, 1))
 smoke.add_color_stop(1, (0, 0, 0, 1))
@@ -55,7 +58,8 @@ flame = scene.layers[1].add_particle_group(
     drag=0.5,
     spin_drag=0.5,
     grow=3,
-    texture='smoke_04'
+    texture='smoke_04',
+    clock=clocks.game,
 )
 flame.add_color_stop(0, (2, 2, 0.2, 1))
 flame.add_color_stop(0.2, (1, 0.3, 0.0, 1))
@@ -82,8 +86,8 @@ def handle_collision(threx, bullet):
     pixels.emit(10, pos=threx.pos, vel=threx.vel, vel_spread=100, size=2, age_spread=0.5, angle_spread=3, spin=10, color='red')
     async def splode(pos, vel):
         with showing(scene.layers[1].add_sprite('light_01', pos=pos, color=(1, 0.3, 0.3, 1.0), scale=0.01)) as ring:
-            w2d.animate(ring, duration=0.3, scale=0.4, color=(1, 0.3, 0.3, 0.0), angle=6)
-            async for dt in w2d.clock.coro.frames_dt():
+            animate(ring, duration=0.3, scale=0.4, color=(1, 0.3, 0.3, 0.0), angle=6)
+            async for dt in coro.frames_dt():
                 ring.pos += vel * dt
 
     game.do(splode(threx.pos, threx.vel))
@@ -398,9 +402,9 @@ async def show_title(text):
         color=(0, 0, 0, 0)
     )
     label.scale = 0.2
-    await w2d.animate(label, duration=0.3, scale=1.0, y=-200, color=(1, 1, 1, 1))
+    await animate(label, duration=0.3, scale=1.0, y=-200, color=(1, 1, 1, 1))
     yield
-    await w2d.animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
+    await animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=-400)
     label.delete()
 
 
@@ -413,7 +417,17 @@ async def wave(wave_num):
     async with w2d.Nursery() as ns:
         for _ in range(wave_num + 1):
             ns.do(do_threx(game))
-    await coro.sleep(1)
+    await slowmo()
+
+
+async def slowmo():
+    """Slow down the game for a moment."""
+    try:
+        await clocks.ui.animate(clocks.game, duration=0.3, rate=0.3)
+        await clocks.ui.coro.sleep(1)
+        await clocks.ui.animate(clocks.game, duration=0.3, rate=1.0)
+    finally:
+        clocks.game.rate = 1.0
 
 
 async def main():

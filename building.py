@@ -12,7 +12,7 @@ import sfx
 from helpers import random_vec2, showing
 from collisions import colgroup
 from controllers import joy_press
-
+from clocks import coro, animate
 
 scene: w2d.Scene = None
 
@@ -31,25 +31,27 @@ async def star_bit(pos):
 
     async def flash():
         for _ in range(2):
-            await w2d.animate(star, color=(0.6, 0.6, 1.0, 1.0))
-            await w2d.animate(star, color=(1.0, 1.0, 1.0, 1.0))
-        for _ in range(6):
-            star.color = (0, 0, 0, 0)
-            await w2d.clock.coro.sleep(0.2)
-            star.color = (0.6, 0.6, 1.0, 1.0)
-            await w2d.clock.coro.sleep(0.3)
+            await animate(star, color=(0.6, 0.6, 1.0, 1.0))
+            await animate(star, color=(1.0, 1.0, 1.0, 1.0))
+
+        with coro.move_on_after(3):
+            while True:
+                star.color = (0, 0, 0, 0)
+                await coro.sleep(0.2)
+                star.color = (0.6, 0.6, 1.0, 1.0)
+                await coro.sleep(0.3)
         ns.cancel()
 
     async def move():
         vel = random_vec2(50)
-        async for dt in w2d.clock.coro.frames_dt():
+        async for dt in coro.frames_dt():
             if star.collected:
                 break
             vel *= 0.5 ** dt
             star.pos += vel * dt
 
         collector = star.collected
-        async for dt in w2d.clock.coro.frames_dt():
+        async for dt in coro.frames_dt():
             sep = star.pos - collector.pos
 
             closer = sep.length() * 0.001 ** dt
@@ -182,7 +184,7 @@ class Base:
 
         self.connectors.update(start_points)
 
-        sleep = w2d.clock.coro.sleep
+        sleep = coro.sleep
         interval = 0.03
 
         # Build the path we'd like the connector to follow
@@ -293,11 +295,11 @@ class Reactor:
         base, reactor = self.sprite
         for s in self.sprite:
             s.color = (1, 1, 1, 0)
-            w2d.animate(s, duration=0.3, color=(1, 1, 1, 1))
+            animate(s, duration=0.3, color=(1, 1, 1, 1))
         reactor.scale = 2.0
         base.scale = 0.5
-        w2d.animate(base, scale=1.0, tween='decelerate')
-        await w2d.animate(
+        animate(base, scale=1.0, tween='decelerate')
+        await animate(
             reactor,
             scale=1.0,
             tween='decelerate',
@@ -335,12 +337,12 @@ class Arsenal:
         radar = self.sprite[1]
         while True:
             da = random.uniform(1, -1)
-            await w2d.animate(
+            await animate(
                 radar,
                 tween='accel_decel',
                 angle=radar.angle + da
             )
-            await w2d.clock.coro.sleep(3)
+            await coro.sleep(3)
 
     async def run_blinkenlights(self):
         ON_COLOR = (0.3, 0.3, 1.0, 1.0)
@@ -348,9 +350,9 @@ class Arsenal:
         while True:
             for b in self.blinkenlights:
                 for _ in range(5):
-                    await w2d.animate(b, duration=0.5, color=ON_COLOR)
-                    await w2d.animate(b, duration=0.5, color=OFF_COLOR)
-                await w2d.animate(b, duration=0.5, color=ON_COLOR)
+                    await animate(b, duration=0.5, color=ON_COLOR)
+                    await animate(b, duration=0.5, color=OFF_COLOR)
+                await animate(b, duration=0.5, color=ON_COLOR)
 
             powerup = scene.layers[0].add_sprite('rocket_pack', pos=self.pos)
             powerup.radius = 20
@@ -366,25 +368,25 @@ class Arsenal:
         self.sprite.scale = 0.3
         rot = random.randint(-2, 2) * (math.pi / 2)
         self.sprite.angle = rot
-        await w2d.animate(self.sprite,
+        await animate(self.sprite,
             scale=1,
             duration=0.3,
             tween='decelerate'
         )
         if rot:
-            await w2d.clock.coro.sleep(0.2)
-            await w2d.animate(self.sprite,
+            await coro.sleep(0.2)
+            await animate(self.sprite,
                 scale=0.8,
                 duration=0.1,
                 tween='decelerate'
             )
-            await w2d.animate(
+            await animate(
                 self.sprite,
                 angle=0,
                 duration=0.2,
                 tween='accel_decel'
             )
-            await w2d.animate(
+            await animate(
                 self.sprite,
                 scale=1,
                 duration=0.2,
@@ -443,7 +445,7 @@ async def building_mode(ship, construction_ns):
     async def update_reticle():
         while True:
             update()
-            await w2d.clock.coro.sleep(0.1)
+            await coro.sleep(0.1)
 
     with showing(obj):
         async with w2d.Nursery() as ns:
