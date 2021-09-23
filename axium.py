@@ -29,8 +29,9 @@ scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=False)
 #scene.chain = [w2d.chain.LayerRange().wrap_effect('pixellate', pxsize=4, antialias=0.5)]
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
+scene.layers[-3].parallax = 0.03
 hud = scene.layers[5]
-hud.is_hud = True
+hud.parallax = 0.0
 
 
 pixels = scene.layers[1].add_particle_group(
@@ -343,7 +344,6 @@ async def do_life():
         async for dt in coro.frames_dt():
             ship.pos += vel * dt
             scene.camera.pos = ship.pos
-            bg.pos = ship.pos - 0.03 * scene.camera.pos
             if vel.length_squared() > 10:
                 ship.angle = vel.angle()
 
@@ -448,7 +448,6 @@ async def play_game(nursery):
 
     while lives:
         if not first_life:
-            clocks.ui.animate(bg, duration=0.5, pos=vec2(0, 0))
             await clocks.ui.animate(scene.camera, duration=0.5, pos=vec2(0, 0))
         lives -= 1
         icons.pop().delete()
