@@ -14,6 +14,8 @@ from collisions import colgroup
 from clocks import coro, animate
 
 scene: w2d.Scene = None
+diffuse = -2
+emissive = -1
 
 
 @colgroup.handler('ship', 'star_bit')
@@ -120,7 +122,7 @@ class Base:
     @property
     def tiles(self):
         if self._tiles is None:
-            self._tiles = scene.layers[-1].add_tile_map()
+            self._tiles = scene.layers[diffuse].add_tile_map()
         return self._tiles
 
     @property
@@ -293,8 +295,8 @@ class Reactor:
     def __init__(self, pos=vec2(0, 0)):
         self.sprite = w2d.Group(
             [
-                scene.layers[-1].add_sprite('component_base'),
-                scene.layers[1].add_sprite('reactor'),
+                scene.layers[diffuse].add_sprite('component_base'),
+                scene.layers[emissive].add_sprite('reactor'),
             ],
             pos=pos
         )
@@ -326,11 +328,11 @@ class Arsenal:
 
     def __init__(self, pos=vec2(0, 0)):
         parts = [
-            scene.layers[-1].add_sprite('arsenal'),
-            scene.layers[-1].add_sprite('radar', pos=(-53, -53)),
+            scene.layers[diffuse].add_sprite('arsenal'),
+            scene.layers[diffuse].add_sprite('radar', pos=(-53, -53)),
         ]
         self.blinkenlights = [
-            scene.layers[-1].add_sprite(
+            scene.layers[emissive].add_sprite(
                 'blinkenlight',
                 color='black',
                 pos=(-54, 55 - 16 * i)

@@ -31,6 +31,15 @@ scene = building.scene = w2d.Scene(1280, 720, title="Axium", fullscreen=True)
 
 bg = scene.layers[-3].add_sprite('space', pos=(0, 0))
 scene.layers[-3].parallax = 0.03
+scene.chain = [
+    w2d.chain.LayerRange(stop=-3),
+    w2d.chain.Light(
+        light=99,
+        diffuse=-2,
+        ambient=(0.4, 0.4, 0.4, 1)
+    ),
+    w2d.chain.LayerRange(-1, 90),
+]
 
 hudvp = scene.create_viewport()
 hud = hudvp.layers[5]
@@ -116,7 +125,6 @@ def explode(pos, vel):
 
     async def trail():
         emitter = flame.add_emitter(
-            pos=pos,
             rate=200,
             size=6,
             pos_spread=3,
@@ -124,12 +132,13 @@ def explode(pos, vel):
             spin_spread=5,
             emit_angle_spread=3,
         )
+        group = w2d.Group([emitter, light(color='orange')], pos=pos)
         emitter_vel = random_vec2(100) + vel
         emitter_accel = random_vec2(200)
-        with showing(emitter):
+        with showing(group):
             async for dt in coro.frames_dt(seconds=random.uniform(0.5, 1.0)):
                 emitter_vel += emitter_accel * dt
-                emitter.pos += emitter_vel * dt
+                group.pos += emitter_vel * dt
                 emitter.rate *= 0.7 ** dt
                 if emitter.rate < 1:
                     break
@@ -138,20 +147,25 @@ def explode(pos, vel):
         game.do(trail())
 
 
+def light(pos=vec2(0, 0), color='white'):
+    return scene.layers[99].add_sprite('point_light', pos=pos, color=color)
+
 
 async def bullet(ship):
     sfx.laser.play()
     vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
-    shot = scene.layers[1].add_sprite(
-        'tripleshot',
+    shot = w2d.Group([
+            scene.layers[1].add_sprite('tripleshot'),
+            light(),
+        ],
         pos=pos,
         angle=ship.angle,
     )
     shot.radius = 20
     with colgroup.tracking(shot, 'bullet'), showing(shot):
         async for dt in coro.frames_dt(seconds=3):
-            if not shot.is_alive():
+            if not shot:
                 break
             shot.pos += vel * dt
 
@@ -170,7 +184,8 @@ async def rocket(ship):
                 size=4,
                 vel=(-100, 0),
                 vel_spread=20,
-            )
+            ),
+            light(pos=(-10, 0), color='orange')
         ],
         pos=pos,
         angle=ship.angle,
@@ -234,6 +249,7 @@ async def threx_shoot(ship):
         [
             scene.layers[1].add_sprite('threx_bullet1'),
             scene.layers[1].add_sprite('threx_bullet2'),
+            light(color='red'),
         ],
         pos=pos
     )
