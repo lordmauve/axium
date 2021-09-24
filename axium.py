@@ -272,13 +272,8 @@ def angle_to(target, from_obj) -> float:
     return r
 
 
-async def do_threx(bullet_nursery):
+async def do_threx(bullet_nursery, pos):
     """Coroutine to run an enemy ship."""
-    pos = vec2(
-        random.uniform(-200, 200),
-        random.uniform(-200, 200),
-    )
-
     ship = scene.layers[0].add_sprite('threx', pos=pos)
     ship.radius = 14
     ship.vel = vec2(250, 0)
@@ -485,8 +480,19 @@ async def wave(wave_num):
             await sfx.play(sound)
 
     async with w2d.Nursery() as ns:
-        for _ in range(wave_num + 1):
-            ns.do(do_threx(game))
+        if wave_num < 4:
+            enemies = wave_num + 1
+        else:
+            enemies = min(wave_num // 2, 12)
+        groups = max(1, min(4, enemies // 3))
+        enemies_per_group = enemies / groups
+        spawned = 0
+        for i in range(groups):
+            group_center = vec2(0, 1500).rotated(random.uniform(0, tau))
+            while spawned < enemies_per_group * (i + 1):
+                pos = group_center + vec2(0, 100).rotated(random.uniform(0, tau))
+                ns.do(do_threx(game, pos))
+                spawned += 1
     await slowmo()
 
 
