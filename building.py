@@ -17,6 +17,9 @@ scene: w2d.Scene = None
 diffuse = -2
 emissive = -1
 
+LIGHTBLUE = (0.6, 0.6, 1.0, 1.0)
+WHITE = (1.0, 1.0, 1.0, 1.0)
+
 
 @colgroup.handler('ship', 'star_bit')
 def handle_collect(ship, star_bit):
@@ -32,8 +35,8 @@ async def star_bit(pos):
 
     async def flash():
         for _ in range(2):
-            await animate(star, color=(0.6, 0.6, 1.0, 1.0))
-            await animate(star, color=(1.0, 1.0, 1.0, 1.0))
+            await animate(star, color=LIGHTBLUE)
+            await animate(star, color=WHITE)
 
         with coro.move_on_after(3):
             while True:
@@ -135,7 +138,7 @@ class Base:
             grow=0.1,
             texture='twirl_02'
         )
-        sparks.add_color_stop(0, (0.0, 0.0, 1.0, 1))
+        sparks.add_color_stop(0, LIGHTBLUE)
         sparks.add_color_stop(1.0, (1.0, 1.0, 1.0, 0))
         return sparks
 
@@ -363,7 +366,7 @@ class Arsenal:
             await coro.sleep(3)
 
     async def run_blinkenlights(self):
-        ON_COLOR = (0.3, 0.3, 1.0, 1.0)
+        ON_COLOR = LIGHTBLUE
         OFF_COLOR = (0, 0, 0, 1.0)
         while True:
             for b in self.blinkenlights:

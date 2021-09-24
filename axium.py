@@ -402,6 +402,7 @@ async def split_screen():
     vp1, hud = scene.viewports
     vp1.width -= 12
     vp2 = scene.viewport.clone(x=scene.width - 10, width=10)
+    vp2.camera.pos = 0, 0
     scene.viewports = [vp1, vp2, hud]
     clocks.game.paused = True
     def split(w):
@@ -447,7 +448,7 @@ async def show_title(text):
 
 
 async def wave(wave_num):
-    async with show_title(f"Begining wave {wave_num}"):
+    async with show_title(f"Beginning wave {wave_num}"):
         await sfx.play('beginning_wave')
         for sound in sfx.spell(wave_num):
             await sfx.play(sound)
