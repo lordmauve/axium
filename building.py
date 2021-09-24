@@ -2,7 +2,7 @@ from typing import Type, TypeVar, NamedTuple
 from itertools import product, count
 from enum import Enum
 import math
-from collections import Counter
+from collections import Counter, deque
 
 import numpy as np
 import wasabi2d as w2d
@@ -27,7 +27,7 @@ WHITE = (1.0, 1.0, 1.0, 1.0)
 @colgroup.handler('ship', 'star_bit')
 def handle_collect(ship, star_bit):
     star_bit.collected = ship
-    ship.balance.value += 100
+    ship.balance.value += random.randint(18, 25) * 10
     colgroup.untrack(star_bit)
 
 
@@ -377,7 +377,7 @@ class Reactor(Building):
         colgroup.track(self, 'building')
 
 
-class Arsenal(Building):
+class Rockets(Building):
     """An armory that produces a pack of rockets."""
     radius = 30
 
@@ -492,29 +492,55 @@ async def building_mode(ship, player, construction_ns):
     def insertion_point():
         return ship.pos + vec2(100, 0).rotated(ship.angle)
 
-    RED = (1.0, 0, 0, 0.4)
-    GREEN = (0, 1.0, 0, 0.4)
+    # RED = (1.0, 0, 0, 0.4)
+    # GREEN = (0, 1.0, 0, 0.4)
 
-    obj = scene.layers[-1].add_sprite('component_base')
+    items = deque([
+        ('blueprint_reactor', Reactor, 2000),
+        ('blueprint_phaser', Rockets, 3000),
+        ('blueprint_rocket', Rockets, 5000),
+        ('blueprint_repair', Rockets, 8000),
+    ])
+    blueprint, cls, cost = items[0]
+    can_place = False
+    obj = scene.layers[-1].add_sprite(blueprint)
 
     def update():
         pos, can_place = base.can_place(insertion_point())
+        if cost > player.balance.value:
+            can_place = False
         obj.pos = pos
-        obj.color = GREEN if can_place else RED
+        obj.color = 'white' if can_place else 'red'
 
     update()
 
     async def process_input():
+        nonlocal blueprint, cls, cost
         while True:
-            button = await player.controller.button_press('a', 'y')
+            button = await player.controller.button_press(
+                'a', 'y', 'leftshoulder', 'rightshoulder'
+            )
             if button == 'y':
                 ns.cancel()
             elif button == 'a':
                 point = insertion_point()
                 pos, can_place = base.can_place(point)
+                if cost > player.balance.value:
+                    continue
                 if can_place:
-                    construction_ns.do(base.place(Arsenal, point))
+                    player.balance.value -= cost
+                    construction_ns.do(base.place(cls, point))
                     ns.cancel()
+            elif button == 'leftshoulder':
+                items.appendleft(items.pop())
+                blueprint, cls, cost = items[0]
+                obj.image = blueprint
+                update()
+            elif button == 'rightshoulder':
+                items.append(items.popleft())
+                blueprint, cls, cost = items[0]
+                obj.image = blueprint
+                update()
 
     async def update_reticle():
         while True:

@@ -267,7 +267,8 @@ async def do_threx(bullet_nursery, pos):
     async def shoot():
         while True:
             async for dt in coro.frames_dt():
-                if abs(angle_to(target, ship)) < 0.2:
+                dist = (target.pos - ship.pos).length()
+                if dist < 500 and abs(angle_to(target, ship)) < 0.2:
                     break
                 await coro.sleep(0.1)
             bullet_nursery.do(threx_shoot(ship))
