@@ -244,6 +244,8 @@ class Base:
 
     def update_tile(self, x, y):
         """Update the tile at the given position."""
+        if (x, y) in self.grid:
+            return
         adj = (
             Connection(x - 1, y, Edge.RIGHT) in self.wiring,
             Connection(x, y, Edge.RIGHT) in self.wiring,
@@ -264,6 +266,7 @@ class Base:
     def burn(self, center):
         for cell in self.cells_for(center):
             self.tiles[cell] = 'burned'
+            self.grid.discard(cell)
         self.connectors -= Counter(self.connectors_for(center))
         self.wiring.difference_update(self.wiring_for(center))
 
