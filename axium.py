@@ -8,7 +8,7 @@ import pygame.mixer
 import random
 from math import tau, pi, sin, cos
 from itertools import count
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 
 import sfx
@@ -282,12 +282,15 @@ async def do_threx(bullet_nursery, pos):
             ns.do(trail(ship, color='red', stroke_width=1))
 
 
-async def do_life(viewport, controller):
-    ship = viewport.layers[0].add_sprite('ship')
+async def do_life(player):
+    viewport = player.viewport
+    controller = player.controller
+    ship = player.viewport.layers[0].add_sprite('ship')
     ship.radius = 12
     ship.weapon = 'bullet'
     ship.weapon_count = inf = float('inf')
     ship.boosting = False
+    ship.balance = player.balance
     targets.add(ship)
 
     async def drive_ship():
@@ -344,7 +347,7 @@ async def do_life(viewport, controller):
                     ship.weapon_count = inf
                 await coro.sleep(0.1)
             elif button == 'y':
-                await building.building_mode(ship, controller, game)
+                await building.building_mode(ship, player, game)
 
     async def radar():
         tracked = {}
@@ -494,6 +497,54 @@ async def slowmo():
 class Player:
     controller: controllers.Controller
     viewport: w2d.scene.Viewport
+    balance: 'Balance'
+
+
+class Balance:
+    def __init__(self, value=0):
+        self._value = self._display_value = value
+        self.sprite = w2d.Group([
+                hud.add_label(
+                    str(int(value)),
+                    font='sector_034',
+                    align="right",
+                    fontsize=20,
+                    color='white',
+                    pos=(-20, 10)
+                ),
+                hud.add_sprite('money_symbol', pos=(-10, 0)),
+            ],
+            pos=(scene.viewport.width - 5, 20)
+        )
+
+    @property
+    def pos(self):
+        return self.sprite.pos
+
+    @pos.setter
+    def pos(self, v):
+        self.sprite.pos = v
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, v):
+        clocks.ui.animate(self, tween='decelerate', display_value=v)
+        self._value = v
+
+    @property
+    def display_value(self):
+        return self._display_value
+
+    @display_value.setter
+    def display_value(self, v):
+        v = self._display_value = int(v)
+        self.sprite[0].text = str(v)
+
+    def delete(self):
+        self.sprite.delete()
 
 
 async def play_game(nursery):
@@ -508,6 +559,7 @@ async def play_game(nursery):
         )
         for i in range(lives)
     ]
+    balance = Balance()
     nursery.do(building.base.place(building.Reactor, vec2(0, 100)))
 
     def take_life():
@@ -518,22 +570,27 @@ async def play_game(nursery):
         icons.pop().delete()
         return True
 
-    async def play(viewport, controller):
+    async def play(player):
         while True:
-            await do_life(viewport, controller)
+            await do_life(player)
             await coro.sleep(3)
             if not take_life():
                 hotplug.cancel()
                 return
             await clocks.ui.animate(
-                viewport.camera,
+                player.viewport.camera,
                 duration=0.5,
                 pos=vec2(0, 0)
             )
 
     async def player2():
         async with split_screen() as (_, vp2):
-            await play(vp2, controllers.sticks[1])
+            player2 = Player(
+                controller=controllers.sticks[1],
+                viewport=vp2,
+                balance=balance,
+            )
+            await play(player2)
 
     async def wait_for_p2():
         await controllers.sticks[1].attached
@@ -549,10 +606,16 @@ async def play_game(nursery):
             await controllers.sticks[1].button_press('start')
             players.do(player2())
 
-    async with w2d.Nursery() as players:
-        players.do(play(scene.viewport, controllers.sticks[0]))
-        async with w2d.Nursery() as hotplug:
-            hotplug.do(wait_for_p2())
+    with showing(balance):
+        async with w2d.Nursery() as players:
+            player1 = Player(
+                controller=controllers.sticks[0],
+                viewport=scene.viewport,
+                balance=balance,
+            )
+            players.do(play(player1))
+            async with w2d.Nursery() as hotplug:
+                hotplug.do(wait_for_p2())
 
     building.base.clear()
 

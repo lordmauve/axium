@@ -12,6 +12,7 @@ import random
 import sfx
 from helpers import random_vec2, showing
 from collisions import colgroup
+import clocks
 from clocks import coro, animate
 import effects
 
@@ -26,6 +27,7 @@ WHITE = (1.0, 1.0, 1.0, 1.0)
 @colgroup.handler('ship', 'star_bit')
 def handle_collect(ship, star_bit):
     star_bit.collected = ship
+    ship.balance.value += 100
     colgroup.untrack(star_bit)
 
 
@@ -132,7 +134,8 @@ class Base:
         self.objects.clear()
         self.connectors.clear()
         self.wiring.clear()
-        self._tiles.clear()
+        if self._tiles:
+            self._tiles.clear()
 
     @property
     def tiles(self):
@@ -484,7 +487,7 @@ def roundto(n, to):
     return (n + to / 2) // to * to
 
 
-async def building_mode(ship, controller, construction_ns):
+async def building_mode(ship, player, construction_ns):
     """Display a reticle where to build the next base object."""
     def insertion_point():
         return ship.pos + vec2(100, 0).rotated(ship.angle)
@@ -503,7 +506,7 @@ async def building_mode(ship, controller, construction_ns):
 
     async def process_input():
         while True:
-            button = await controller.button_press('a', 'y')
+            button = await player.controller.button_press('a', 'y')
             if button == 'y':
                 ns.cancel()
             elif button == 'a':
