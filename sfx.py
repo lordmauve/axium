@@ -68,6 +68,21 @@ powerup = Sound(buffer=pyfxr.SFX(
 ))
 powerup.set_volume(0.3)
 
+impacts = [
+    Sound(buffer=pyfxr.SFX(
+        base_freq=0.44 + i * 0.03,
+        freq_ramp=-0.652,
+        env_attack=0.0,
+        env_sustain=0.098,
+        env_decay=0.131,
+        hpf_freq=0.197,
+        wave_type=pyfxr.WaveType.NOISE,
+    ))
+    for i in range(3)
+]
+[i.set_volume(0.3) for i in impacts]
+def impact():
+    random.choice(impacts).play()
 
 @lru_cache
 def placement(n):

@@ -87,9 +87,11 @@ class CollisionGroup:
                         yield from collisions_y(found)
                     found = [o]
                 mark = max(mark, right(o))
-            if len(found) == len(objects):
+
+            n_found = len(found)
+            if 1 < n_found == len(objects) or n_found <= 3:
                 yield found
-            elif len(found) > 1:
+            elif n_found > 1:
                 yield from collisions_y(found)
 
         collisions_x = partial(

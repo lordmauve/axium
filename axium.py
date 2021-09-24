@@ -18,6 +18,7 @@ from collisions import colgroup
 import controllers
 from clocks import coro, animate
 import clocks
+import effects
 
 
 # Ship deceleration
@@ -45,41 +46,7 @@ hudvp = scene.create_viewport()
 hud = hudvp.layers[5]
 radar_layer = hudvp.layers[0]
 
-
-pixels = scene.layers[1].add_particle_group(
-    max_age=1.5,
-    clock=clocks.game,
-)
-pixels.add_color_stop(0, (1, 1, 1, 1))
-pixels.add_color_stop(1, (1, 1, 1, 1))
-pixels.add_color_stop(1.5, (1, 1, 1, 0))
-
-smoke = scene.layers[1].add_particle_group(
-    max_age=3,
-    drag=0.1,
-    spin_drag=0.5,
-    grow=2,
-    texture='smoke_04',
-    clock=clocks.game,
-)
-smoke.add_color_stop(0, (0.3, 0.3, 0.3, 1))
-smoke.add_color_stop(1, (0, 0, 0, 1))
-smoke.add_color_stop(3, (0, 0, 0, 0))
-
-flame = scene.layers[1].add_particle_group(
-    max_age=1,
-    drag=0.5,
-    spin_drag=0.5,
-    grow=3,
-    texture='smoke_04',
-    clock=clocks.game,
-)
-flame.add_color_stop(0, (2, 2, 0.2, 1))
-flame.add_color_stop(0.2, (1, 0.3, 0.0, 1))
-flame.add_color_stop(0.5, (0, 0, 0.0, 1))
-flame.add_color_stop(1, (0, 0, 0, 0))
-
-
+effects.init(scene)
 
 # The set of objects the Threx would like to attack
 targets = set()
@@ -87,69 +54,46 @@ targets = set()
 
 @colgroup.handler('ship', 'threx_bullet')
 def handle_collision(ship, shot):
-    explode(pos=ship.pos, vel=ship.vel)
-    ship.nursery.cancel()
+    kill_ship(ship)
     shot.delete()
     colgroup.untrack(shot)
 
 
-@colgroup.handler('threx', 'bullet')
-def handle_collision(threx, bullet):
-    pixels.emit(10, pos=threx.pos, vel=threx.vel, vel_spread=100, size=2, age_spread=0.5, angle_spread=3, spin=10, color='red')
-    async def splode(pos, vel):
-        with showing(scene.layers[1].add_sprite('light_01', pos=pos, color=(1, 0.3, 0.3, 1.0), scale=0.01)) as ring:
-            animate(ring, duration=0.3, scale=0.4, color=(1, 0.3, 0.3, 0.0), angle=6)
-            async for dt in coro.frames_dt():
-                ring.pos += vel * dt
+def kill_ship(ship):
+    effects.explode(pos=ship.pos, vel=ship.vel)
+    ship.nursery.cancel()
 
-    game.do(splode(threx.pos, threx.vel))
+
+def kill_threx(threx):
+    effects.pixels.emit(
+        10,
+        pos=threx.pos,
+        vel=threx.vel,
+        vel_spread=100,
+        size=2,
+        age_spread=0.5,
+        angle_spread=3,
+        spin=10,
+        color='red'
+    )
+    effects.pop(threx.pos, threx.vel, (1.0, 0.3, 0.3, 0.6))
     for _ in range(random.randint(1, 3)):
         game.do(building.star_bit(threx.pos))
     threx.nursery.cancel()
+
+
+@colgroup.handler('ship', 'threx')
+def handle_collision(ship, threx):
+    kill_ship(ship)
+    kill_threx(threx)
+
+
+@colgroup.handler('threx', 'bullet')
+def handle_collision(threx, bullet):
+    kill_threx(threx)
     bullet.delete()
     colgroup.untrack(bullet)
 
-
-def explode(pos, vel):
-    sfx.explosion.play()
-    scene.camera.screen_shake(10)
-    smoke.emit(
-        20,
-        pos=pos,
-        vel=vel * 0.6,
-        vel_spread=100,
-        angle_spread=3,
-        spin_spread=5,
-        age_spread=0.3,
-        size=12
-    )
-
-    async def trail():
-        emitter = flame.add_emitter(
-            rate=200,
-            size=6,
-            pos_spread=3,
-            vel_spread=10,
-            spin_spread=5,
-            emit_angle_spread=3,
-        )
-        group = w2d.Group([emitter, light(color='orange')], pos=pos)
-        emitter_vel = random_vec2(100) + vel
-        emitter_accel = random_vec2(200)
-        with showing(group):
-            async for dt in coro.frames_dt(seconds=random.uniform(0.5, 1.0)):
-                emitter_vel += emitter_accel * dt
-                group.pos += emitter_vel * dt
-                emitter.rate *= 0.7 ** dt
-                if emitter.rate < 1:
-                    break
-
-    for _ in range(random.randint(2, 5)):
-        game.do(trail())
-
-
-def light(pos=vec2(0, 0), color='white'):
-    return scene.layers[99].add_sprite('point_light', pos=pos, color=color)
 
 
 async def bullet(ship):
@@ -158,7 +102,7 @@ async def bullet(ship):
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = w2d.Group([
             scene.layers[1].add_sprite('tripleshot'),
-            light(),
+            effects.mklight(),
         ],
         pos=pos,
         angle=ship.angle,
@@ -178,7 +122,7 @@ async def rocket(ship):
     shot = w2d.Group(
         [
             scene.layers[1].add_sprite('rocket'),
-            flame.add_emitter(
+            effects.flame.add_emitter(
                 rate=100,
                 pos=(-10, 0),
                 pos_spread=1,
@@ -186,7 +130,7 @@ async def rocket(ship):
                 vel=(-100, 0),
                 vel_spread=20,
             ),
-            light(pos=(-10, 0), color='orange')
+            effects.mklight(pos=(-10, 0), color='orange')
         ],
         pos=pos,
         angle=ship.angle,
@@ -215,7 +159,7 @@ async def rocket(ship):
             if not shot:
                 break
             shot.pos += vel * dt
-    explode(shot.pos, vec2(0, 0))
+    effects.explode(shot.pos, vec2(0, 0))
 
 
 async def trail(obj, color='white', stroke_width=2):
@@ -250,10 +194,11 @@ async def threx_shoot(ship):
         [
             scene.layers[1].add_sprite('threx_bullet1'),
             scene.layers[1].add_sprite('threx_bullet2'),
-            light(color='red'),
+            effects.mklight(color='red'),
         ],
         pos=pos
     )
+    shot.vel = vel
     shot.radius = 12
     with colgroup.tracking(shot, 'threx_bullet'), showing(shot):
         async for dt in coro.frames_dt(seconds=2):
@@ -279,10 +224,16 @@ async def do_threx(bullet_nursery, pos):
     ship.vel = vec2(250, 0)
     ship.rudder = 0
 
-    if random.randrange(5) > 0 and building.base.objects:
-        target = random.choice(building.base.objects)
-    else:
-        target = random.choice(list(targets))
+    target = None
+
+    def pick_target():
+        nonlocal target
+        if random.randrange(5) > 0 and building.base.objects:
+            target = random.choice(building.base.objects)
+        else:
+            target = random.choice(list(targets))
+
+    pick_target()
 
     async def drive():
         turn_rate = 3.0
@@ -334,6 +285,7 @@ async def do_life(viewport, controller):
     ship.radius = 12
     ship.weapon = 'bullet'
     ship.weapon_count = inf = float('inf')
+    ship.boosting = False
     targets.add(ship)
 
     async def drive_ship():
@@ -345,9 +297,38 @@ async def do_life(viewport, controller):
                 ship.angle = vel.angle()
 
             vel = vel * (DECEL ** dt) + controller.read_stick() * ACCEL * dt
-            if controller.b() and vel.length_squared() > 9:
-                vel = vel.scaled_to(600)
+            if ship.boosting and vel.length_squared() > 9:
+                vel = vel.scaled_to(700)
+                effects.pixels.emit(
+                    np.random.poisson(20 * dt),
+                    pos=ship.pos,
+                    pos_spread=3,
+                    vel=vel * -0.2,
+                    size=1.3,
+                    spin=3,
+                    color=(0.6, 0.6, 1.0, 0.5)
+                )
             ship.vel = vel
+
+    async def boost():
+        while True:
+            await controller.button_press('b')
+            ship.boosting = True
+            backwards_left = vec2(-60, -20).rotated(ship.angle)
+            backwards_right = vec2(-60, 20).rotated(ship.angle)
+            for v in (backwards_left, backwards_right):
+                effects.pixels.emit(
+                    15,
+                    pos=ship.pos,
+                    pos_spread=3,
+                    vel=v,
+                    vel_spread=6,
+                    size=1.3,
+                    spin=v.y * 0.25,
+                    color=(0.6, 0.6, 1.0, 0.5)
+                )
+            await controller.button_release('b')
+            ship.boosting = False
 
     async def shoot():
         while True:
@@ -406,6 +387,7 @@ async def do_life(viewport, controller):
             ns.do(shoot())
             ns.do(trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
             ns.do(radar())
+            ns.do(boost())
     targets.remove(ship)
 
 
@@ -617,6 +599,7 @@ async def main():
         while True:
             stick = await title()
             async with w2d.Nursery() as game:
+                effects.game = game
                 game.do(play_game(game))
                 game.do(screenshot(controllers.sticks[0]))
                 game.do(collisions())

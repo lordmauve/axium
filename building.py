@@ -12,6 +12,7 @@ import sfx
 from helpers import random_vec2, showing
 from collisions import colgroup
 from clocks import coro, animate
+import effects
 
 scene: w2d.Scene = None
 diffuse = -2
@@ -100,8 +101,19 @@ class Connection(NamedTuple):
 
 @colgroup.handler('threx_bullet', 'building')
 def handle_collect(bullet, building):
-    pass
-    #bullet.delete()
+    bullet.delete()
+    effects.pixels.emit(
+        random.randint(3, 6),
+        pos=bullet.pos,
+        vel=bullet.vel * 0.1,
+        size=2,
+        spin=3,
+        vel_spread=30,
+        color=(0.3, 0.3, 0.3, 1.0)
+    )
+    effects.pop(bullet.pos, bullet.vel * 0.2, color=LIGHTBLUE)
+    sfx.impact()
+    #building.hit(bullet.damage)
     # TODO: damage
 
 
