@@ -537,8 +537,17 @@ async def play_game(nursery):
 
     async def wait_for_p2():
         await controllers.sticks[1].attached
-        await controllers.sticks[1].button_press('start')
-        players.do(player2())
+        p2_start = hud.add_label(
+            "Player 2 Press start",
+            font='sector_034',
+            align="center",
+            fontsize=14,
+            pos=((hudvp.width * 3) // 4, hudvp.height - 20),
+            color=(1, 1, 1, 0.33)
+        )
+        with showing(p2_start):
+            await controllers.sticks[1].button_press('start')
+            players.do(player2())
 
     async with w2d.Nursery() as players:
         players.do(play(scene.viewport, controllers.sticks[0]))
@@ -552,10 +561,10 @@ async def play_game(nursery):
 
 async def joystick_ready():
     label = hud.add_label(
-        "Please attach a joystick",
+        "Please connect a game controller",
         font='sector_034',
         align="center",
-        fontsize=25,
+        fontsize=20,
         pos=(hudvp.width // 2, 450),
         color='white',
     )
