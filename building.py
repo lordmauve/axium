@@ -574,16 +574,17 @@ async def building_mode(ship, player, construction_ns):
     def insertion_point():
         return ship.pos + vec2(100, 0).rotated(ship.angle)
 
-    # RED = (1.0, 0, 0, 0.4)
-    # GREEN = (0, 1.0, 0, 0.4)
-
     items = deque([
-        ('blueprint_phaser', PhaserBay, 0),
+        ('blueprint_phaser', PhaserBay, 3000),
         ('blueprint_rocket', Rockets, 5000),
         ('blueprint_repair', Rockets, 8000),
         ('blueprint_reactor', Reactor, 2000),
     ])
     blueprint, cls, cost = items[0]
+    if not base.sufficient_power(cls):
+        items.appendleft(items.pop())  # Cycle to the reactor
+        blueprint, cls, cost = items[0]
+
     can_place = False
     obj = scene.layers[-1].add_sprite(blueprint)
 
