@@ -12,12 +12,13 @@ class CollisionGroup:
         self.dead = set()
         self.types = {}
         self.handlers = {}
-        self.type_names = set()
+        self.by_type: dict[str, set] = {}
 
     def add_handler(self, type_a: str, type_b: str, func):
         """Register an object"""
         self.handlers[type_a, type_b] = func
-        self.type_names.update((type_a, type_b))
+        self.by_type.setdefault(type_a, set())
+        self.by_type.setdefault(type_b, set())
 
     def handler(self, type_a: str, type_b: str):
         """Decorator to register a handler for some types"""
@@ -30,8 +31,9 @@ class CollisionGroup:
 
         The object should have .pos and .radius attributes.
         """
-        assert type in self.type_names, \
+        assert type in self.by_type, \
             f"No collision handlers for {type}"
+        self.by_type[type].add(obj)
         self.objects.append(obj)
         self.types[obj] = type
 
@@ -41,7 +43,9 @@ class CollisionGroup:
         This is a no-op if the object is already untracked.
         """
         self.dead.add(obj)
-        self.types.pop(obj, None)
+        type = self.types.pop(obj, None)
+        if type:
+            self.by_type[type].discard(obj)
 
     @contextmanager
     def tracking(self, obj: object, type: str):
@@ -56,10 +60,7 @@ class CollisionGroup:
         """Find objects within the given radius around pos."""
         found = []
         rsquare = radius * radius
-        for o in self.objects:
-            if self.types.get(o) != type:
-                continue
-
+        for o in self.by_type[type]:
             r = o.radius
             if (o.pos - pos).length_squared() < (rsquare + r * r):
                 found.append(o)

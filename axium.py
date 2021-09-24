@@ -43,6 +43,7 @@ scene.chain = [
 
 hudvp = scene.create_viewport()
 hud = hudvp.layers[5]
+radar_layer = hudvp.layers[0]
 
 
 pixels = scene.layers[1].add_particle_group(
@@ -279,7 +280,6 @@ async def do_threx(bullet_nursery):
     )
 
     ship = scene.layers[0].add_sprite('threx', pos=pos)
-    mark = hud.add_sprite('radarmark', color='red')
     ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
@@ -299,12 +299,6 @@ async def do_threx(bullet_nursery):
             ship.angle = ship.vel.angle()
             cam = scene.camera.pos
             off = (ship.pos - cam)
-            if off.length() > 360:
-                mark.pos = off.scaled_to(300)
-                mark.angle = off.angle()
-                mark.color = 'red'
-            else:
-                mark.color = (0, 0, 0, 0)
 
     async def steer():
         async for dt in coro.frames_dt():
@@ -331,7 +325,7 @@ async def do_threx(bullet_nursery):
             bullet_nursery.do(threx_shoot(ship))
             await coro.sleep(1)
 
-    with colgroup.tracking(ship, 'threx'), showing(ship), showing(mark):
+    with colgroup.tracking(ship, 'threx'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(drive())
@@ -374,12 +368,49 @@ async def do_life(viewport, controller):
             elif button == 'y':
                 await building.building_mode(ship, controller, game)
 
+    async def radar():
+        tracked = {}
+        transparent = (0, 0, 0, 0)
+        try:
+            async for _ in coro.frames_dt():
+                current_threx = colgroup.by_type['threx']
+                new_threx = current_threx - tracked.keys()
+                for target in new_threx:
+                    mark = tracked[target] = radar_layer.add_sprite(
+                        'radarmark',
+                        color=transparent,
+                        scale=3.0
+                    )
+                    mark.anim = w2d.animate(mark, duration=0.5, scale=1.0)
+                dead_threx = tracked.keys() - current_threx
+                for t in dead_threx:
+                    mark.anim.stop()
+                    tracked.pop(t).delete()
+                center = viewport.camera.pos
+                vprect = viewport.rect
+                vprect.center = center
+                vpradius = min(viewport.dims) // 2 - 30
+                vpcenter = viewport.center
+
+                for target, mark in tracked.items():
+                    off = target.pos - center
+                    onscreen = vprect.collidepoint(target.pos)
+                    mark.color = transparent if onscreen else 'red'
+                    mark.pos = vpcenter + off.safe_scaled_to(vpradius)
+                    mark.angle = off.angle()
+        finally:
+            for mark in tracked.values():
+                mark.anim.stop()
+                mark.delete()
+
+
     with colgroup.tracking(ship, 'ship'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(drive_ship())
             ns.do(shoot())
             ns.do(trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
+            ns.do(radar())
     targets.remove(ship)
 
 
