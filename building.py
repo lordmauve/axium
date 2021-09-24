@@ -126,9 +126,10 @@ class Base:
         self.objects = []
         self.connectors: Counter[tuple[int, int]] = Counter()
         self.wiring: tuple[int, int, Edge] = set()
+        self.power = 0
 
     def clear(self):
-        for o in self.objects:
+        for o in self.objects[:]:
             o.delete()
         self.grid.clear()
         self.objects.clear()
@@ -312,18 +313,33 @@ class Base:
             ns.do(obj.build(self))
         return obj
 
+    def sufficient_power(self, cls) -> bool:
+        """Return True if there is sufficient power to place this object."""
+        return (self.power - len(self.objects) + cls.POWER) > 0
+
 
 base = Base()
 
 
 class Building:
     health = 50
+    radius = 72
     nursery = None
+    POWER = 0
 
     def __init__(self, base, pos, cell):
         self.base = base
         self.pos = pos
         self.cell = cell
+        self.nursery = w2d.Nursery()
+        self.sprite = self.build_sprite()
+        self.sprite.pos = pos
+
+    def delete(self):
+        self.base.objects.remove(self)
+        self.sprite.delete()
+        self.nursery.cancel()
+        colgroup.untrack(self)
 
     def hit(self, damage) -> bool:
         """Take damage.
@@ -347,20 +363,23 @@ class Reactor(Building):
 
     def __init__(self, base, pos, cell):
         super().__init__(base, pos, cell)
-        self.sprite = w2d.Group(
+
+    def build_sprite(self):
+        return w2d.Group(
             [
                 scene.layers[diffuse].add_sprite('component_base'),
                 scene.layers[emissive].add_sprite('reactor'),
             ],
-            pos=pos
         )
 
     def delete(self):
-        self.sprite.delete()
-        colgroup.untrack(self)
+        super().delete()
+        self.base.power -= self.POWER
+
+    POWER = 4
 
     async def build(self, base):
-        self.base = base
+        self.base.power += self.POWER
         base, reactor = self.sprite
         for s in self.sprite:
             s.color = (1, 1, 1, 0)
@@ -379,10 +398,8 @@ class Reactor(Building):
 
 class Rockets(Building):
     """An armory that produces a pack of rockets."""
-    radius = 30
 
-    def __init__(self, base, pos, cell):
-        super().__init__(base, pos, cell)
+    def build_sprite(self):
         parts = [
             scene.layers[diffuse].add_sprite('arsenal'),
             scene.layers[diffuse].add_sprite('radar', pos=(-53, -53)),
@@ -395,17 +412,9 @@ class Rockets(Building):
             )
             for i in range(5)
         ]
-        self.sprite = w2d.Group(
-            parts + self.blinkenlights,
-            pos=pos
+        return w2d.Group(
+            parts + self.blinkenlights
         )
-        self.nursery = w2d.Nursery()
-        self.collected = w2d.Event()
-
-    def delete(self):
-        self.sprite.delete()
-        self.nursery.cancel()
-        colgroup.untrack(self)
 
     async def run_radar(self):
         radar = self.sprite[1]
@@ -430,11 +439,12 @@ class Rockets(Building):
 
             powerup = scene.layers[0].add_sprite('rocket_pack', pos=self.pos)
             powerup.radius = 20
-            powerup.event = self.collected
-            with colgroup.tracking(powerup, 'rocket_pack'), \
+            powerup.event = w2d.Event()
+            powerup.weapon = 'rocket'
+            powerup.weapon_count = 3
+            with colgroup.tracking(powerup, 'powerup'), \
                     showing(powerup):
-                await self.collected
-                self.collected = w2d.Event()
+                await powerup.event
                 for b in self.blinkenlights:
                     b.color = OFF_COLOR
 
@@ -472,14 +482,86 @@ class Rockets(Building):
                 self.nursery.do(self.run_blinkenlights())
 
 
-@colgroup.handler('ship', 'rocket_pack')
+class PhaserBay(Building):
+    """An armory that produces two packs of phasers."""
+
+    def build_sprite(self):
+        parts = [
+            scene.layers[diffuse].add_sprite('phaserbay')
+        ]
+
+        self.lights_top, self.lights_bottom = [
+            [
+                scene.layers[emissive].add_sprite(
+                    'blinkenlight',
+                    color='black',
+                    pos=(18, j * (38 - 16 * i))
+                )
+                for i in range(2)
+            ]
+            for j in (-1, 1)
+        ]
+        return w2d.Group(
+            parts + self.lights_top + self.lights_bottom,
+        )
+
+    async def run_radar(self):
+        radar = self.sprite[1]
+        while True:
+            da = random.uniform(1, -1)
+            await animate(
+                radar,
+                tween='accel_decel',
+                angle=radar.angle + da
+            )
+            await coro.sleep(3)
+
+    async def run_bay(self, lights, spawn_pos):
+        ON_COLOR = LIGHTBLUE
+        OFF_COLOR = (0, 0, 0, 1.0)
+        while True:
+            for b in lights:
+                for _ in range(5):
+                    await animate(b, duration=0.5, color=ON_COLOR)
+                    await animate(b, duration=0.5, color=OFF_COLOR)
+                await animate(b, duration=0.5, color=ON_COLOR)
+
+            powerup = scene.layers[0].add_sprite(
+                'phaser_pack',
+                pos=self.pos + spawn_pos
+            )
+            powerup.radius = 20
+            powerup.event = w2d.Event()
+            powerup.weapon = 'phaser'
+            powerup.weapon_count = 8
+            with colgroup.tracking(powerup, 'powerup'), \
+                    showing(powerup):
+                await powerup.event
+                for b in lights:
+                    b.color = OFF_COLOR
+
+    async def build(self, base):
+        self.sprite.scale = 0.3
+        await animate(self.sprite,
+            scale=1,
+            duration=0.3,
+            tween='decelerate'
+        )
+        with colgroup.tracking(self, "building"):
+            async with self.nursery:
+                self.nursery.do(self.run_bay(self.lights_top, vec2(-26, -33)))
+                await coro.sleep(1.0)
+                self.nursery.do(self.run_bay(self.lights_bottom, vec2(-26, 33)))
+
+
+@colgroup.handler('ship', 'powerup')
 def handle_collect(ship, powerup):
     powerup.event.set()
-    if ship.weapon != 'rocket':
-        ship.weapon = 'rocket'
-        ship.weapon_count = 3
+    if ship.weapon != powerup.weapon:
+        ship.weapon = powerup.weapon
+        ship.weapon_count = powerup.weapon_count
     else:
-        ship.weapon_count += 3
+        ship.weapon_count += powerup.weapon_count
     sfx.powerup.play()
 
 
@@ -496,10 +578,10 @@ async def building_mode(ship, player, construction_ns):
     # GREEN = (0, 1.0, 0, 0.4)
 
     items = deque([
-        ('blueprint_reactor', Reactor, 2000),
-        ('blueprint_phaser', Rockets, 3000),
+        ('blueprint_phaser', PhaserBay, 0),
         ('blueprint_rocket', Rockets, 5000),
         ('blueprint_repair', Rockets, 8000),
+        ('blueprint_reactor', Reactor, 2000),
     ])
     blueprint, cls, cost = items[0]
     can_place = False
@@ -508,6 +590,8 @@ async def building_mode(ship, player, construction_ns):
     def update():
         pos, can_place = base.can_place(insertion_point())
         if cost > player.balance.value:
+            can_place = False
+        elif not base.sufficient_power(cls):
             can_place = False
         obj.pos = pos
         obj.color = 'white' if can_place else 'red'
@@ -526,6 +610,10 @@ async def building_mode(ship, player, construction_ns):
                 point = insertion_point()
                 pos, can_place = base.can_place(point)
                 if cost > player.balance.value:
+                    # Speak
+                    continue
+                if not base.sufficient_power(cls):
+                    # Speak
                     continue
                 if can_place:
                     player.balance.value -= cost

@@ -89,31 +89,51 @@ def handle_collision(ship, threx):
 @colgroup.handler('threx', 'bullet')
 def handle_collision(threx, bullet):
     kill_threx(threx)
-    bullet.delete()
-    colgroup.untrack(bullet)
+    if bullet.fragile:
+        bullet.delete()
+        colgroup.untrack(bullet)
     for _ in range(random.randint(1, 3)):
         game.do(building.star_bit(threx.pos))
 
 
-
 async def bullet(ship):
     sfx.laser.play()
-    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
-    pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = w2d.Group([
             scene.layers[1].add_sprite('tripleshot'),
             effects.mklight(),
         ],
-        pos=pos,
-        angle=ship.angle,
     )
     shot.damage = 5
-    shot.radius = 20
+    shot.radius = 10
+    shot.fragile = True
+    await shoot(shot, ship)
+
+
+async def shoot(shot, shooter):
+    vel = vec2(BULLET_SPEED, 0).rotated(shooter.angle) + shooter.vel
+    shot.pos = shooter.pos + vec2(20, 0).rotated(shooter.angle)
+    shot.angle = shooter.angle
     with colgroup.tracking(shot, 'bullet'), showing(shot):
         async for dt in coro.frames_dt(seconds=3):
             if not shot:
                 break
             shot.pos += vel * dt
+
+
+async def phaser(ship):
+    sfx.laser.play()
+    light = effects.mklight()
+    light.scale *= 2
+    shot = w2d.Group([
+            scene.layers[1].add_sprite('phaser'),
+            light,
+        ]
+    )
+    shot.radius = 22
+    shot.damage = 10
+    shot.type = 'phaser'
+    shot.fragile = False
+    await shoot(shot, ship)
 
 
 async def rocket(ship):
