@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 import sfx
 import building
-from helpers import showing, random_vec2
+from helpers import showing, random_ring
 from collisions import colgroup
 import controllers
 from clocks import coro, animate
@@ -496,9 +496,9 @@ async def wave(wave_num):
         enemies_per_group = enemies / groups
         spawned = 0
         for i in range(groups):
-            group_center = vec2(0, 1500).rotated(random.uniform(0, tau))
+            group_center = random_ring(1500)
             while spawned < enemies_per_group * (i + 1):
-                pos = group_center + vec2(0, 100).rotated(random.uniform(0, tau))
+                pos = group_center + random_ring(100)
                 ns.do(do_threx(game, pos))
                 spawned += 1
     await slowmo()

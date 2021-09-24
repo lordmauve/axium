@@ -10,7 +10,7 @@ from wasabigeom import vec2
 import random
 
 import sfx
-from helpers import random_vec2, showing
+from helpers import random_vec2, showing, random_ring
 from collisions import colgroup
 import clocks
 from clocks import coro, animate
@@ -554,6 +554,143 @@ class PhaserBay(Building):
                 self.nursery.do(self.run_bay(self.lights_bottom, vec2(-26, 33)))
 
 
+class RepairBay(Building):
+
+    def build_sprite(self):
+        group = w2d.Group([
+            scene.layers[diffuse].add_sprite('repairbay'),
+            scene.layers[diffuse].add_sprite('iris'),
+        ])
+        self.iris = group[1]
+        self.iris.scale = 0.01
+        self.iris_waiting = w2d.Event()
+        self.iris_open = w2d.Event()
+        self.repairing = set()
+        return group
+
+    async def run_drones(self):
+        while True:
+            most_damaged = None
+            most_damaged_frac = 2
+            for o in self.base.objects:
+                frac = o.health / type(o).health
+                if frac >= 1:
+                    continue
+                if o in self.repairing:
+                    continue
+                if frac < most_damaged_frac:
+                    most_damaged_frac = frac
+                    most_damaged = o
+            if most_damaged:
+                self.nursery.do(self.drone(most_damaged))
+            await coro.sleep(1)
+
+    async def drone(self, target):
+        self.repairing.add(target)
+        DRONE_SPEED = 200
+        try:
+            await self.open_iris()
+            drone = scene.layers[0].add_sprite(
+                'repairdrone',
+                pos=self.pos,
+                color=(0, 0, 0, 1.0),
+                scale=0.1
+            )
+            with showing(drone):
+                sep = target.pos - self.pos
+                await animate(
+                    drone,
+                    duration=0.2,
+                    scale=1.0,
+                    angle=sep.angle(),
+                    color=(1, 1, 1, 1.0),
+                )
+
+                if sep.is_zero():
+                    dest = self.pos + random_ring(100)
+                else:
+                    dest = target.pos - sep.safe_scaled_to(100)
+
+                async def go_to(dest):
+                    sep = dest - drone.pos
+                    time = sep.length() / DRONE_SPEED
+                    await face(dest)
+                    await animate(drone, tween='accel_decel', pos=dest, duration=time)
+
+                async def face(dest):
+                    sep = dest - drone.pos
+                    await animate(drone, duration=0.1, angle=sep.angle())
+
+                async def heal():
+                    sep = target.pos - drone.pos
+                    effects.pixels.emit(
+                        20,
+                        pos=drone.pos,
+                        vel=sep.safe_scaled_to(60),
+                        age_spread=0.1,
+                        vel_spread=20,
+                        size=2,
+                        color=(0, 1, 0, 0.4),
+                    )
+                    light = effects.mklight(pos=drone.pos, color=(0, 1, 0, 0.4))
+                    light.scale = 2
+                    target.health = min(target.health + 5, type(target).health)
+                    with showing(light):
+                        await animate(light, duration=0.4, scale=0.1)
+
+                new_pos = dest
+                while target.health < type(target).health:
+                    await go_to(new_pos)
+                    if target.health < 0:
+                        break
+                    await face(target.pos)
+                    if target.health < 0:
+                        break
+                    await heal()
+                    new_pos = target.pos + random_ring(100)
+
+                await go_to(self.pos)
+                await self.open_iris()
+                await animate(
+                    drone,
+                    duration=0.2,
+                    scale=0.1,
+                    color=(0, 0, 0, 1.0)
+                )
+        finally:
+            self.repairing.discard(target)
+
+    async def open_iris(self):
+        if self.iris_open.is_set():
+            return
+        self.iris_waiting.set()
+        await self.iris_open
+
+    async def iris_control(self):
+        while True:
+            await self.iris_waiting
+            await animate(self.iris, duration=0.1, tween='decelerate', scale=1.0)
+            self.iris_open.set()
+            await coro.sleep(1.0)
+            self.iris_open = w2d.Event()
+            self.iris_waiting = w2d.Event()
+            await animate(self.iris, duration=0.1, tween='decelerate', scale=0.01)
+
+    async def build(self, base):
+        self.sprite.scale = 0.3
+        await animate(self.sprite,
+            scale=1,
+            duration=0.3,
+            tween='decelerate'
+        )
+        with colgroup.tracking(self, "building"):
+            async with self.nursery:
+                self.nursery.do(self.run_drones())
+                self.nursery.do(self.iris_control())
+
+
+
+
 @colgroup.handler('ship', 'powerup')
 def handle_collect(ship, powerup):
     powerup.event.set()
@@ -577,7 +714,7 @@ async def building_mode(ship, player, construction_ns):
     items = deque([
         ('blueprint_phaser', PhaserBay, 3000),
         ('blueprint_rocket', Rockets, 5000),
-        ('blueprint_repair', Rockets, 8000),
+        ('blueprint_repair', RepairBay, 8000),
         ('blueprint_reactor', Reactor, 2000),
     ])
     blueprint, cls, cost = items[0]
