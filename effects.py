@@ -58,8 +58,6 @@ def mklight(pos=vec2(0, 0), color='white'):
     return scene.layers[99].add_sprite('point_light', pos=pos, color=color)
 
 
-
-
 def pop(pos, vel, color=(1, 1, 1, 1)):
     async def run_pop():
         ring = scene.layers[1].add_sprite(
@@ -121,5 +119,5 @@ def explode(pos, vel):
                 if emitter.rate < 1:
                     break
 
-    for _ in range(random.randint(2, 5)):
+    for _ in range(random.randint(2, 4)):
         game.do(trail())

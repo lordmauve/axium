@@ -2,6 +2,7 @@ from typing import Type, TypeVar, NamedTuple
 from itertools import product, count
 from enum import Enum
 import math
+from collections import Counter
 
 import numpy as np
 import wasabi2d as w2d
@@ -113,8 +114,7 @@ def handle_collect(bullet, building):
     )
     effects.pop(bullet.pos, bullet.vel * 0.2, color=LIGHTBLUE)
     sfx.impact()
-    #building.hit(bullet.damage)
-    # TODO: damage
+    building.hit(bullet.damage)
 
 
 class Base:
@@ -122,7 +122,7 @@ class Base:
         self._tiles = self._sparks = None
         self.grid = set()
         self.objects = []
-        self.connectors: set[tuple[int, int]] = set()
+        self.connectors: Counter[tuple[int, int]] = Counter()
         self.wiring: tuple[int, int, Edge] = set()
 
     def clear(self):
@@ -261,6 +261,12 @@ class Base:
             angle_spread=3,
         )
 
+    def burn(self, center):
+        for cell in self.cells_for(center):
+            self.tiles[cell] = 'burned'
+        self.connectors -= Counter(self.connectors_for(center))
+        self.wiring.difference_update(self.wiring_for(center))
+
     ADJ_MAP = {
         # l, r, u, d
         (1, 1, 0, 0): 'connector_lr',
@@ -290,7 +296,7 @@ class Base:
         for pos in self.cells_for(cell):
             del self.tiles[pos]
         self.grid.update(self.cells_for(cell))
-        obj = type(world_pos)
+        obj = type(self, world_pos, cell)
         self.objects.append(obj)
 
         self.wiring.update(self.wiring_for(cell))
@@ -304,10 +310,37 @@ class Base:
 base = Base()
 
 
-class Reactor:
-    radius = 60
+class Building:
+    health = 50
+    nursery = None
 
-    def __init__(self, pos=vec2(0, 0)):
+    def __init__(self, base, pos, cell):
+        self.base = base
+        self.pos = pos
+        self.cell = cell
+
+    def hit(self, damage) -> bool:
+        """Take damage.
+
+        Return True if the building was destroyed.
+        """
+        self.health -= damage
+        if self.health > 0:
+            return False
+
+        for _ in range(2):
+            effects.explode(self.pos + random_vec2(48), vel=vec2(0, 0))
+        self.base.burn(self.cell)
+        self.delete()
+        return True
+
+
+class Reactor(Building):
+    radius = 60
+    health = 100
+
+    def __init__(self, base, pos, cell):
+        super().__init__(base, pos, cell)
         self.sprite = w2d.Group(
             [
                 scene.layers[diffuse].add_sprite('component_base'),
@@ -315,12 +348,13 @@ class Reactor:
             ],
             pos=pos
         )
-        self.pos = pos
 
     def delete(self):
         self.sprite.delete()
+        colgroup.untrack(self)
 
     async def build(self, base):
+        self.base = base
         base, reactor = self.sprite
         for s in self.sprite:
             s.color = (1, 1, 1, 0)
@@ -337,11 +371,12 @@ class Reactor:
         colgroup.track(self, 'building')
 
 
-class Arsenal:
+class Arsenal(Building):
     """An armory that produces a pack of rockets."""
     radius = 30
 
-    def __init__(self, pos=vec2(0, 0)):
+    def __init__(self, base, pos, cell):
+        super().__init__(base, pos, cell)
         parts = [
             scene.layers[diffuse].add_sprite('arsenal'),
             scene.layers[diffuse].add_sprite('radar', pos=(-53, -53)),
@@ -358,13 +393,13 @@ class Arsenal:
             parts + self.blinkenlights,
             pos=pos
         )
-        self.pos = pos
         self.nursery = w2d.Nursery()
         self.collected = w2d.Event()
 
     def delete(self):
         self.sprite.delete()
         self.nursery.cancel()
+        colgroup.untrack(self)
 
     async def run_radar(self):
         radar = self.sprite[1]

@@ -77,8 +77,6 @@ def kill_threx(threx):
         color='red'
     )
     effects.pop(threx.pos, threx.vel, (1.0, 0.3, 0.3, 0.6))
-    for _ in range(random.randint(1, 3)):
-        game.do(building.star_bit(threx.pos))
     threx.nursery.cancel()
 
 
@@ -93,6 +91,8 @@ def handle_collision(threx, bullet):
     kill_threx(threx)
     bullet.delete()
     colgroup.untrack(bullet)
+    for _ in range(random.randint(1, 3)):
+        game.do(building.star_bit(threx.pos))
 
 
 
@@ -107,6 +107,7 @@ async def bullet(ship):
         pos=pos,
         angle=ship.angle,
     )
+    shot.damage = 5
     shot.radius = 20
     with colgroup.tracking(shot, 'bullet'), showing(shot):
         async for dt in coro.frames_dt(seconds=3):
@@ -200,6 +201,7 @@ async def threx_shoot(ship):
     )
     shot.vel = vel
     shot.radius = 12
+    shot.damage = 5
     with colgroup.tracking(shot, 'threx_bullet'), showing(shot):
         async for dt in coro.frames_dt(seconds=2):
             if not shot:
