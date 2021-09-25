@@ -9,6 +9,11 @@ import wasabi2d as w2d
 mixer.pre_init(44100, channels=1)
 mixer.init()
 
+from wasabi2d import music
+
+music.set_volume(0.2)
+music.play('for_robots')
+
 
 laser = Sound(buffer=pyfxr.SFX(
     base_freq=0.61,
