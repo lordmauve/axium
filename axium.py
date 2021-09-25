@@ -402,7 +402,9 @@ async def do_life(player):
             async for _ in coro.frames_dt():
                 objects = {(t, 'red') for t in colgroup.by_type['threx']}
                 objects |= {(t, blue) for t in colgroup.by_type['building']}
-
+                objects |= {
+                    (t, blue) for t in colgroup.by_type['ship'] if t is not ship
+                }
                 new_objects = objects - tracked.keys()
                 for target in new_objects:
                     mark = tracked[target] = radar_layer.add_sprite(
