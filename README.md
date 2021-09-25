@@ -55,9 +55,13 @@ The players share the lives and credit balance.
   cannot attack the Threx and are destroyed if theor repair bay is destroyed.
 
 
-## Installation
+## Install and run
 
 Install all requirements from `requirements.txt`.
+
+To run, type
+
+    python axium.py
 
 
 ## Credits
