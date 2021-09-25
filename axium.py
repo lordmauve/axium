@@ -685,7 +685,7 @@ async def joystick_ready():
 
 async def title():
     title = w2d.Group([
-        hud.add_sprite('title', pos=(hudvp.width // 2, 250)),
+        hud.add_sprite('title', pos=(hudvp.width // 2, 150)),
     ])
     async def orbit():
         theta = 0
@@ -700,12 +700,16 @@ async def title():
         async with w2d.Nursery() as ns:
             ns.do(orbit())
             await joystick_ready()
+            title.append(hud.add_sprite(
+                "controls",
+                pos=(hudvp.width // 2, 400),
+            ))
             title.append(hud.add_label(
                 "Press start to begin",
                 font='sector_034',
                 align="center",
                 fontsize=25,
-                pos=(hudvp.width // 2, 450),
+                pos=(hudvp.width // 2, 650),
                 color='white',
             ))
 
