@@ -441,7 +441,7 @@ class Rockets(Building):
             powerup.radius = 20
             powerup.event = w2d.Event()
             powerup.weapon = 'rocket'
-            powerup.weapon_count = 3
+            powerup.weapon_count = 5
             with colgroup.tracking(powerup, 'powerup'), \
                     showing(powerup):
                 await powerup.event
