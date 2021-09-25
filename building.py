@@ -620,7 +620,7 @@ class RepairBay(Building):
                     await animate(drone, tween='accel_decel', pos=dest, duration=time)
 
                 async def face(dest):
-                    angle = angle_to_pos(dest, drone.pos)
+                    angle = angle_to_pos(dest, drone)
                     if abs(angle) < 0.02:
                         return
                     await animate(drone, duration=0.1, angle=drone.angle + angle)

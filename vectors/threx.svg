@@ -7,6 +7,7 @@
    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    width="27.411137"
@@ -20,7 +21,76 @@
    inkscape:export-xdpi="88.404961"
    inkscape:export-ydpi="88.404961">
   <defs
-     id="defs2" />
+     id="defs2">
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient3058">
+      <stop
+         style="stop-color:#fff0f0;stop-opacity:1"
+         offset="0"
+         id="stop3054" />
+      <stop
+         id="stop3062"
+         offset="0.3166284"
+         style="stop-color:#aa0000;stop-opacity:0.79523808" />
+      <stop
+         style="stop-color:#aa0000;stop-opacity:0;"
+         offset="1"
+         id="stop3056" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       id="linearGradient3048">
+      <stop
+         style="stop-color:#aa0000;stop-opacity:1;"
+         offset="0"
+         id="stop3044" />
+      <stop
+         style="stop-color:#aa0000;stop-opacity:0;"
+         offset="1"
+         id="stop3046" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3048"
+       id="linearGradient3050"
+       x1="18.119665"
+       y1="275.99533"
+       x2="15.126245"
+       y2="275.99533"
+       gradientUnits="userSpaceOnUse" />
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3058"
+       id="radialGradient3060"
+       cx="20.411501"
+       cy="275.2002"
+       fx="20.411501"
+       fy="275.2002"
+       r="2.5724692"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.72727273,0,0,0.72727273,4.1413973,75.676336)" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3048"
+       id="linearGradient3081"
+       gradientUnits="userSpaceOnUse"
+       x1="18.119665"
+       y1="275.99533"
+       x2="15.126245"
+       y2="275.99533" />
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient3058"
+       id="radialGradient3083"
+       gradientUnits="userSpaceOnUse"
+       gradientTransform="matrix(0.72727273,0,0,0.72727273,4.1413973,75.676336)"
+       cx="20.411501"
+       cy="275.2002"
+       fx="20.411501"
+       fy="275.2002"
+       r="2.5724692" />
+  </defs>
   <sodipodi:namedview
      id="base"
      pagecolor="#000000"
@@ -28,9 +98,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:zoom="7.9659998"
-     inkscape:cx="-11.466953"
-     inkscape:cy="-6.8227452"
+     inkscape:zoom="1.4142136"
+     inkscape:cx="22.374138"
+     inkscape:cy="81.564931"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -53,7 +123,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title></dc:title>
+        <dc:title />
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -115,5 +185,109 @@
        id="path1958"
        style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:0.75;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#ffaaaa;fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.26458332;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
        sodipodi:type="star" />
+    <g
+       id="g3069"
+       transform="matrix(1.2234998,0,0,1.2240293,-3.0179683,-62.029547)"
+       style="stroke-width:0.81715065"
+       inkscape:export-filename="/home/mauve/dev/axium/images/threx_interceptor.png"
+       inkscape:export-xdpi="88.404961"
+       inkscape:export-ydpi="88.404961">
+      <path
+         sodipodi:nodetypes="cccccccccc"
+         inkscape:connector-curvature="0"
+         id="path1951-6"
+         d="m 11.846852,276.82611 -2.5036083,0.41495 1.0109133,1.74627 -2.369332,-1.73704 -0.815012,-0.2053 v -0.455 l 0.805777,-0.12889 2.328571,-1.74626 -0.9701533,1.73703 z"
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#810000;fill-opacity:1;fill-rule:nonzero;stroke:#800000;stroke-width:0.18618116;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate" />
+      <g
+         transform="translate(-1.8520833,-2.778125)"
+         id="g3010"
+         style="stroke-width:0.81715065">
+        <g
+           transform="matrix(1.3285529,0,0,1.3285529,-1.0046981,-103.57122)"
+           id="g2989"
+           style="stroke-width:0.81715065">
+          <path
+             style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;vector-effect:none;fill:#aa0000;fill-opacity:1;fill-rule:nonzero;stroke:#800000;stroke-width:0.14013831;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
+             d="m 12.353382,288.41839 -3.8935099,0.64625 -1.8812818,2.12219 0.5340669,-2.10781 -1.0034339,-0.31974 v -0.70861 l 0.9890719,-0.20074 -0.5197049,-2.12219 1.8669199,2.10782 z"
+             id="path2985"
+             inkscape:connector-curvature="0"
+             sodipodi:nodetypes="cccccccccc" />
+          <path
+             style="fill:none;fill-rule:evenodd;stroke:#800000;stroke-width:0.21620443px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+             d="m 7.1403976,287.80195 0.6935871,0.66549 -0.7086651,0.57674 v 0 0"
+             id="path2987"
+             inkscape:connector-curvature="0"
+             sodipodi:nodetypes="ccccc" />
+        </g>
+      </g>
+    </g>
+    <g
+       transform="matrix(2.2014789,0,0,2.1934311,-14.553317,-354.25951)"
+       id="g3020"
+       style="stroke-width:0.45507267"
+       inkscape:export-filename="/home/mauve/dev/axium/images/threx_bomber.png"
+       inkscape:export-xdpi="88.404961"
+       inkscape:export-ydpi="88.404961">
+      <path
+         sodipodi:nodetypes="cccccccccc"
+         inkscape:connector-curvature="0"
+         id="path3012"
+         d="m 13.062809,279.62508 -2.503608,0.56642 1.010913,2.38368 -2.3693317,-2.37108 -0.815012,-0.28024 v -0.62108 l 0.805777,-0.17594 2.3285707,-2.38368 -0.970153,2.37108 z"
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#810000;fill-opacity:1;fill-rule:nonzero;stroke:#800000;stroke-width:0.10368462;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate" />
+      <g
+         transform="matrix(1.3285529,0,0,1.3285529,-1.0046981,-103.57122)"
+         id="g3018"
+         style="stroke-width:0.45507267">
+        <path
+           style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:#aa0000;fill-opacity:1;fill-rule:nonzero;stroke:#800000;stroke-width:0.09062842;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
+           d="m 9.4273668,288.41839 -1.2267739,0.64625 0.3695126,2.71964 -1.5988733,-2.70526 0.6465248,-0.31974 v -0.70861 l -0.6608868,-0.20074 1.6132353,-2.71964 -0.3838745,2.70527 z"
+           id="path3014"
+           inkscape:connector-curvature="0"
+           sodipodi:nodetypes="cccccccccc" />
+      </g>
+    </g>
+    <g
+       id="g3073"
+       transform="matrix(1.3257177,0,0,1.3257177,-5.1097001,-90.775523)"
+       style="stroke-width:0.7543084"
+       inkscape:export-filename="/home/mauve/dev/axium/images/threx_phaser.png"
+       inkscape:export-xdpi="88.404961"
+       inkscape:export-ydpi="88.404961">
+      <rect
+         ry="0.52920955"
+         rx="0.52920955"
+         y="275.15344"
+         x="15.687511"
+         height="1.403165"
+         width="3.9288619"
+         id="rect3042"
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:url(#linearGradient3050);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.19957742px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate" />
+      <circle
+         r="1.8708867"
+         cy="275.82193"
+         cx="18.986126"
+         id="path3052"
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;vector-effect:none;fill:url(#radialGradient3060);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.19957742;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate" />
+    </g>
+    <g
+       style="stroke-width:0.7543084"
+       transform="matrix(1.3257177,0,0,1.3257177,-5.1097001,-84.22742)"
+       id="g3079">
+      <rect
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;fill:url(#linearGradient3081);fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.19957742px;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
+         id="rect3075"
+         width="3.9288619"
+         height="1.403165"
+         x="15.687511"
+         y="275.15344"
+         rx="0.52920955"
+         ry="0.52920955" />
+      <circle
+         style="color:#000000;clip-rule:nonzero;display:inline;overflow:visible;visibility:visible;opacity:1;isolation:auto;mix-blend-mode:normal;color-interpolation:sRGB;color-interpolation-filters:linearRGB;solid-color:#000000;solid-opacity:1;vector-effect:none;fill:url(#radialGradient3083);fill-opacity:1;fill-rule:nonzero;stroke:none;stroke-width:0.19957742;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;marker:none;color-rendering:auto;image-rendering:auto;shape-rendering:auto;text-rendering:auto;enable-background:accumulate"
+         id="circle3077"
+         cx="18.986126"
+         cy="275.82193"
+         r="1.8708867" />
+    </g>
   </g>
 </svg>

@@ -37,8 +37,8 @@ def init(s: w2d.Scene):
         texture='smoke_04',
         clock=clocks.game,
     )
-    smoke.add_color_stop(0, (0.3, 0.3, 0.3, 1))
-    smoke.add_color_stop(1, (0, 0, 0, 1))
+    smoke.add_color_stop(0, (1, 1, 1, 1))
+    smoke.add_color_stop(1, (1, 1, 1, 1))
     smoke.add_color_stop(3, (0, 0, 0, 0))
 
     flame = scene.layers[1].add_particle_group(
@@ -97,7 +97,8 @@ def explode(pos, vel):
         angle_spread=3,
         spin_spread=5,
         age_spread=0.3,
-        size=12
+        size=12,
+        color=(0, 0, 0, 1)
     )
 
     async def trail():

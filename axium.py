@@ -5,7 +5,7 @@ import pygame
 import pygame.mixer
 import random
 from math import tau, pi, sin, cos
-from itertools import count
+from itertools import count, cycle
 from contextlib import asynccontextmanager, contextmanager
 from dataclasses import dataclass
 
@@ -87,12 +87,15 @@ def handle_collision(ship, threx):
 
 @colgroup.handler('threx', 'bullet')
 def handle_collision(threx, bullet):
-    kill_threx(threx)
-    if bullet.fragile:
+    threx.health -= bullet.damage
+    if threx.health <= 0:
+        kill_threx(threx)
+        for _ in range(random.randint(1, 3)):
+            game.do(building.star_bit(threx.pos))
+
+    if threx.health > 0 or bullet.fragile:
         bullet.delete()
         colgroup.untrack(bullet)
-    for _ in range(random.randint(1, 3)):
-        game.do(building.star_bit(threx.pos))
 
 
 async def bullet(ship):
@@ -102,18 +105,18 @@ async def bullet(ship):
             effects.mklight(),
         ],
     )
-    shot.damage = 5
+    shot.damage = 10
     shot.radius = 10
     shot.fragile = True
     await shoot(shot, ship)
 
 
-async def shoot(shot, shooter):
+async def shoot(shot, shooter, offset=vec2(20, 0), type='bullet', max_age=3):
     vel = vec2(BULLET_SPEED, 0).rotated(shooter.angle) + shooter.vel
-    shot.pos = shooter.pos + vec2(20, 0).rotated(shooter.angle)
+    shot.pos = shooter.pos + offset.rotated(shooter.angle)
     shot.angle = shooter.angle
-    with colgroup.tracking(shot, 'bullet'), showing(shot):
-        async for dt in coro.frames_dt(seconds=3):
+    with colgroup.tracking(shot, type), showing(shot):
+        async for dt in coro.frames_dt(seconds=max_age):
             if not shot:
                 break
             shot.pos += vel * dt
@@ -130,7 +133,6 @@ async def phaser(ship):
     )
     shot.radius = 22
     shot.damage = 10
-    shot.type = 'phaser'
     shot.fragile = False
     await shoot(shot, ship)
 
@@ -156,6 +158,8 @@ async def rocket(ship):
         angle=ship.angle,
     )
     shot.radius = 20
+    shot.damage = 20
+    shot.fragile = True
 
     target = None
 
@@ -182,12 +186,9 @@ async def rocket(ship):
     effects.explode(shot.pos, vec2(0, 0))
 
 
-async def threx_shoot(ship, direction=None):
+async def threx_shoot(ship):
     sfx.enemy_laser.play()
-    if direction is not None:
-        vel = direction.scaled_to(BULLET_SPEED) + ship.vel
-    else:
-        vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
+    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = w2d.Group(
         [
@@ -209,22 +210,91 @@ async def threx_shoot(ship, direction=None):
             shot[1].angle -= 2 * dt
 
 
+async def threx_bomb(ship, offset):
+    sfx.enemy_laser.play()
+    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
+    pos = ship.pos + offset.rotated(ship.angle)
+    shot = w2d.Group(
+        [
+            scene.layers[1].add_sprite('threx_bullet1'),
+            scene.layers[1].add_sprite('threx_bullet2'),
+            effects.mklight(color='red'),
+            effects.smoke.add_emitter(
+                rate=20,
+                color=(1, 0, 0, 0.6),
+            )
+        ],
+        pos=pos
+    )
+    shot.vel = vel
+    shot.radius = 12
+    shot.damage = 15
+    with colgroup.tracking(shot, 'threx_bullet'), showing(shot):
+        async for dt in coro.frames_dt(seconds=3):
+            if not shot:
+                break
+            shot.pos += vel * dt
+            shot[0].angle += 4 * dt
+            shot[1].angle -= 2 * dt
+
+
 async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
     """Coroutine to run an enemy ship."""
-    ship = scene.layers[0].add_sprite('threx', pos=pos)
-    ship.radius = 14
-    ship.speed = 250
+
+    if ship_plan['type'] == 'fighter':
+        ship = scene.layers[0].add_sprite('threx', pos=pos)
+        ship.radius = 14
+        ship.speed = 250
+        ship.weapon_interval = 1.0
+        ship.health = 10
+        def weapon_func():
+            bullet_nursery.do(threx_shoot(ship))
+    elif ship_plan['type'] == 'interceptor':
+        ship = scene.layers[0].add_sprite('threx_interceptor', pos=pos)
+        ship.radius = 18
+        ship.speed = 350
+        ship.health = 10
+        ship.weapon_interval = 0.5
+        def weapon_func():
+            for port in (vec2(0, -15), vec2(0, 15)):
+                shot = w2d.Group(
+                    [
+                        scene.layers[1].add_sprite('threx_phaser', pos=(-5, 0)),
+                        effects.mklight(color='red'),
+                    ]
+                )
+                shot.radius = 8
+                shot.damage = 5
+                bullet_nursery.do(shoot(
+                    shot,
+                    ship,
+                    offset=port,
+                    type='threx_bullet',
+                    max_age=1
+                ))
+    elif ship_plan['type'] == 'bomber':
+        ship = scene.layers[0].add_sprite('threx', pos=pos)
+        ship.radius = 30
+        ship.speed = 100
+        ship.health = 40
+        ship.weapon_interval = 1.0
+        ports = cycle([vec2(10, -25), vec2(10, 25)])
+        def weapon_func():
+            port = next(ports)
+            bullet_nursery.do(threx_bomb(ship, port))
+    else:
+        raise ValueError(f"Unknown ship type {ship_plan['type']}")
+
     ship.vel = vec2(ship.speed, 0)
     ship.rudder = 0
     ship.plan = ship_plan
-    ship.weapon_interval = 1.0
 
     if not ship.plan['group_aware']:
         groupctx = ai.Group()
     ship.groupctx = groupctx
 
-    def weapon_func(direction=None):
-        bullet_nursery.do(threx_shoot(ship, direction))
+    def weapon_func():
+        bullet_nursery.do(threx_shoot(ship))
 
     ai.pick_target(ship)
     with colgroup.tracking(ship, 'threx'), showing(ship):
