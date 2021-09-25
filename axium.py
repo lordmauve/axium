@@ -92,6 +92,18 @@ def handle_collision(threx, bullet):
         kill_threx(threx)
         for _ in range(random.randint(1, 3)):
             game.do(building.star_bit(threx.pos))
+    else:
+        effects.pixels.emit(
+            5,
+            pos=threx.pos,
+            vel=bullet.vel * 0.3,
+            vel_spread=50,
+            size=2,
+            age_spread=0.5,
+            angle_spread=3,
+            spin=10,
+            color='red'
+        )
 
     if threx.health > 0 or bullet.fragile:
         bullet.delete()
@@ -115,6 +127,7 @@ async def shoot(shot, shooter, offset=vec2(20, 0), type='bullet', max_age=3):
     vel = vec2(BULLET_SPEED, 0).rotated(shooter.angle) + shooter.vel
     shot.pos = shooter.pos + offset.rotated(shooter.angle)
     shot.angle = shooter.angle
+    shot.vel = vel
     with colgroup.tracking(shot, type), showing(shot):
         async for dt in coro.frames_dt(seconds=max_age):
             if not shot:
@@ -160,6 +173,7 @@ async def rocket(ship):
     shot.radius = 20
     shot.damage = 20
     shot.fragile = True
+    shot.vel = vel
 
     target = None
 
@@ -183,6 +197,7 @@ async def rocket(ship):
             if not shot:
                 break
             shot.pos += vel * dt
+            shot.vel = vel
     effects.explode(shot.pos, vec2(0, 0))
 
 
@@ -220,8 +235,11 @@ async def threx_bomb(ship, offset):
             scene.layers[1].add_sprite('threx_bullet2'),
             effects.mklight(color='red'),
             effects.smoke.add_emitter(
-                rate=20,
+                rate=70,
                 color=(1, 0, 0, 0.6),
+                emit_angle_spread=3,
+                spin_spread=2,
+                size=5,
             )
         ],
         pos=pos
@@ -247,6 +265,8 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         ship.speed = 250
         ship.weapon_interval = 1.0
         ship.health = 10
+        ship.turn_rate = 3.0
+
         def weapon_func():
             bullet_nursery.do(threx_shoot(ship))
     elif ship_plan['type'] == 'interceptor':
@@ -255,6 +275,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         ship.speed = 350
         ship.health = 10
         ship.weapon_interval = 0.5
+        ship.turn_rate = 2.0
         def weapon_func():
             for port in (vec2(0, -15), vec2(0, 15)):
                 shot = w2d.Group(
@@ -273,11 +294,12 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
                     max_age=1
                 ))
     elif ship_plan['type'] == 'bomber':
-        ship = scene.layers[0].add_sprite('threx', pos=pos)
+        ship = scene.layers[0].add_sprite('threx_bomber', pos=pos)
         ship.radius = 30
-        ship.speed = 100
+        ship.speed = 150
         ship.health = 40
         ship.weapon_interval = 1.0
+        ship.turn_rate = 1.0
         ports = cycle([vec2(10, -25), vec2(10, 25)])
         def weapon_func():
             port = next(ports)
@@ -293,9 +315,6 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         groupctx = ai.Group()
     ship.groupctx = groupctx
 
-    def weapon_func():
-        bullet_nursery.do(threx_shoot(ship))
-
     ai.pick_target(ship)
     with colgroup.tracking(ship, 'threx'), showing(ship):
         async with w2d.Nursery() as ns:
@@ -303,6 +322,9 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
             ns.do(ai.reconsider_target(ship))
             ns.do(getattr(ai, ship.plan['ai'])(ship, weapon_func))
             ns.do(effects.trail(ship, color='red', stroke_width=1))
+
+    if ship_plan['type'] == 'bomber':
+        effects.explode(ship.pos, vec2(0, 0))
 
 
 async def do_life(player):
@@ -482,14 +504,14 @@ async def show_title(text):
     label.delete()
 
 
-async def wave(wave_num):
+async def wave(wave_num, groups=None):
     async with show_title(f"Beginning wave {wave_num}"):
         await sfx.play('beginning_wave')
         for sound in sfx.spell(wave_num):
             await sfx.play(sound)
 
     async with w2d.Nursery() as ns:
-        groups = waves.plan_ships_of_wave(wave_num)
+        groups = groups or waves.plan_ships_of_wave(wave_num)
         for plan, groupctx in zip(groups, ai.mkgroups(len(groups))):
             group_center = random_ring(1500)
             for ship_plan in plan:
@@ -688,6 +710,12 @@ async def main():
     p = ArgumentParser()
     p.add_argument('--wave', type=int, help="Wave to start with", default=1)
     p.add_argument('--cash', type=int, help="Start with extra cash", default=0)
+    p.add_argument(
+        '--test-threx',
+        action='store_true',
+        help="Walk through enemy ship combos",
+        default=False
+    )
     args = p.parse_args()
 
     Balance.INITIAL_BALANCE = args.cash or 0
@@ -712,9 +740,12 @@ async def main():
                     #
                     # async with title("Get ready!"):
                     #     await coro.sleep(20)
-                    await coro.sleep(20)
+                    await coro.sleep(5)
                 for wave_num in count(args.wave):
-                    await wave(wave_num)
+                    if args.test_threx:
+                        await wave(wave_num, waves.test_ship_type(wave_num))
+                    else:
+                        await wave(wave_num)
         services.cancel()
 
 

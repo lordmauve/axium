@@ -102,6 +102,19 @@ def plan_ships_of_wave(wave_num):
     return groups
 
 
+def test_ship_type(n):
+    types = sorted(combos(AI_COSTS, TYPE_COSTS))
+    score, (ai, type) = types[n % len(types)]
+    ship = {
+        'ai': ai,
+        'type': type,
+        'group_aware': False,
+        'score': score,
+    }
+    print(f"{n}:", ship)
+    return [[ship]]
+
+
 if __name__ == '__main__':
     # for i in range(1, 101):
     #     print(plan_wave(i))

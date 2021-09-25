@@ -101,6 +101,8 @@ def pick_target(ship):
         ship.target = ship.groupctx.get_fighter_target(ship.pos)
     else:
         ship.target = ship.groupctx.get_base_target()
+        if ship.target is NULL_TARGET:
+            ship.target = ship.groupctx.get_fighter_target(ship.pos)
 
 
 async def reconsider_target(ship):
@@ -110,10 +112,8 @@ async def reconsider_target(ship):
 
 
 async def drive(ship):
-    turn_rate = 3.0
-
     async for dt in coro.frames_dt():
-        ship.vel = ship.vel.rotated(ship.rudder * turn_rate * dt)
+        ship.vel = ship.vel.rotated(ship.rudder * ship.turn_rate * dt)
 
         ship.pos += ship.vel * dt
         ship.angle = ship.vel.angle()
@@ -171,7 +171,7 @@ async def drive_kamikaze(ship):
         'bomber': 120,
     }
     target.hit(damage[ship.plan['type']])
-
+    ship.nursery.cancel()
 
 
 async def attack(ship, weapon_func):
@@ -217,11 +217,23 @@ async def zapper(ship, weapon_func):
 
     while True:
         target = ship.target
+
         if not await move_to_firing_pos():
             continue
 
         sep = target.pos - ship.pos
         await animate(ship, duration=0.1, angle=sep.angle())
+        dir = random.uniform(-0.5, 0.5)
+
         while ship.target is target:
             weapon_func()
             await weapon_cooldown(ship)
+
+            new_firing_pos = target.pos + (ship.pos - target.pos).rotated(dir)
+            await animate(
+                ship,
+                duration=0.4,
+                tween='accel_decel',
+                pos=new_firing_pos,
+                angle=(target.pos - new_firing_pos).angle()
+            )
