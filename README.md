@@ -22,6 +22,7 @@ controllers are very good.
 * B (right button): boost
 * Y (top button): build mode
 * Left/Right Shoulder: select building
+* Start: begin game/pause
 
 Axium reads the
 [Game Controller DB file](https://github.com/gabomdq/SDL_GameControllerDB)
