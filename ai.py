@@ -176,24 +176,27 @@ async def shoot(ship, fire_weapon):
 
 
 async def drive_kamikaze(ship):
-    async for dt in coro.frames_dt():
-        target = ship.target
-        sep = target.pos - ship.pos
-        if target is not NULL_TARGET \
-            and sep.length_squared() < target.radius ** 2 + ship.radius ** 2:
-            break
-        ship.angle = sep.angle()
-        ship.vel = sep.scaled_to(ship.speed)
-        ship.pos += ship.vel * dt
+    while True:
+        async for dt in coro.frames_dt():
+            target = ship.target
+            sep = target.pos - ship.pos
+            if target is not NULL_TARGET \
+                and sep.length_squared() < target.radius ** 2 + ship.radius ** 2:
+                break
+            ship.angle = sep.angle()
+            ship.vel = sep.scaled_to(ship.speed)
+            ship.pos += ship.vel * dt
 
-    effects.explode(ship.pos, ship.vel * 0.2)
-    damage = {
-        'fighter': 30,
-        'interceptor': 50,
-        'bomber': 120,
-    }
-    target.hit(damage[ship.plan['type']])
-    ship.nursery.cancel()
+        if target in colgroup.by_type['building']:
+            effects.explode(ship.pos, ship.vel * 0.2)
+            damage = {
+                'fighter': 30,
+                'interceptor': 50,
+                'bomber': 120,
+            }
+            target.hit(damage[ship.plan['type']])
+            ship.nursery.cancel()
+            return
 
 
 async def attack(ship, weapon_func):

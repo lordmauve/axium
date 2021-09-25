@@ -322,7 +322,7 @@ base = Base()
 
 
 class Building:
-    health = 50
+    health = 60
     radius = 72
     nursery = None
     POWER = 0
@@ -359,7 +359,7 @@ class Building:
 
 class Reactor(Building):
     radius = 60
-    health = 100
+    health = 110
 
     def __init__(self, base, pos, cell):
         super().__init__(base, pos, cell)
@@ -638,7 +638,7 @@ class RepairBay(Building):
                     )
                     light = effects.mklight(pos=drone.pos, color=(1, 1, 0.9, 1.0))
                     light.scale = 1.5
-                    target.health = min(target.health + 2, type(target).health)
+                    target.health = min(target.health + 4, type(target).health)
                     with showing(light):
                         await animate(light, duration=0.4, scale=0.1)
 
