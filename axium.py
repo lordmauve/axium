@@ -136,7 +136,7 @@ async def shoot(shot, shooter, offset=vec2(20, 0), type='bullet', max_age=3):
 
 
 async def phaser(ship):
-    sfx.laser.play()
+    sfx.phaser.play()
     light = effects.mklight()
     light.scale *= 2
     shot = w2d.Group([
@@ -151,7 +151,7 @@ async def phaser(ship):
 
 
 async def rocket(ship):
-    sfx.laser.play()
+    sfx.rocket.play()
     vel = vec2(ROCKET_SPEED, 0).rotated(ship.angle) + ship.vel
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = w2d.Group(
@@ -325,6 +325,9 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
 
     if ship_plan['type'] == 'bomber':
         effects.explode(ship.pos, vec2(0, 0))
+        sfx.explosion.play()
+    else:
+        sfx.explosion_small.play()
 
 
 async def do_life(player):

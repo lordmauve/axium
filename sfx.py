@@ -53,6 +53,23 @@ explosion = Sound(buffer=pyfxr.SFX(
 ))
 explosion.set_volume(0.4)
 
+explosion_small = Sound(buffer=pyfxr.SFX(
+    base_freq=0.06,
+    freq_limit=0.0,
+    freq_ramp=0.0,
+    freq_dramp=-0.16,
+    env_attack=0.0,
+    env_sustain=0.2,
+    env_decay=0.38,
+    env_punch=0.37,
+    pha_offset=-0.045,
+    pha_ramp=-0.197,
+    arp_speed=0.72,
+    arp_mod=0.404,
+    wave_type=pyfxr.WaveType.NOISE,
+))
+explosion_small.set_volume(0.2)
+
 powerup = Sound(buffer=pyfxr.SFX(
     base_freq=0.241,
     freq_ramp=0.16,
@@ -67,6 +84,36 @@ powerup = Sound(buffer=pyfxr.SFX(
     wave_type=pyfxr.WaveType.SQUARE,
 ))
 powerup.set_volume(0.3)
+
+rocket = Sound(buffer=pyfxr.SFX(
+    base_freq=0.25,
+    freq_limit=0.07,
+    freq_ramp=0.16,
+    freq_dramp=-0.2,
+    duty=0.46,
+    duty_ramp=0.06,
+    env_attack=0.19,
+    env_sustain=0.17,
+    env_decay=0.51,
+    env_punch=0.15,
+    wave_type=pyfxr.WaveType.NOISE,
+))
+rocket.set_volume(0.15)
+
+phaser = Sound(buffer=pyfxr.SFX(
+    base_freq=0.31,
+    freq_limit=0.19,
+    freq_ramp=-0.19,
+    duty=0.701,
+    duty_ramp=-0.192,
+    env_attack=0.0,
+    env_sustain=0.32,
+    env_decay=0.16,
+    hpf_freq=0.189,
+    wave_type=pyfxr.WaveType.SINE,
+))
+phaser.set_volume(0.2)
+
 
 impacts = [
     Sound(buffer=pyfxr.SFX(
