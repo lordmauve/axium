@@ -315,7 +315,7 @@ class Base:
 
     def sufficient_power(self, cls) -> bool:
         """Return True if there is sufficient power to place this object."""
-        return (self.power - len(self.objects) + cls.POWER) > 0
+        return (self.power + cls.POWER) >= len(self.objects)
 
 
 base = Base()
