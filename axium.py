@@ -104,6 +104,7 @@ def handle_collision(threx, bullet):
             spin=10,
             color='red'
         )
+        sfx.impact()
 
     if threx.health > 0 or bullet.fragile:
         bullet.delete()
@@ -145,7 +146,7 @@ async def phaser(ship):
         ]
     )
     shot.radius = 22
-    shot.damage = 10
+    shot.damage = 15
     shot.fragile = False
     await shoot(shot, ship)
 
@@ -273,7 +274,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         ship = scene.layers[0].add_sprite('threx_interceptor', pos=pos)
         ship.radius = 18
         ship.speed = 350
-        ship.health = 10
+        ship.health = 10 + ship_plan['strength'] // 10 * 10
         ship.weapon_interval = 0.5
         ship.turn_rate = 2.0
         def weapon_func():
@@ -297,7 +298,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         ship = scene.layers[0].add_sprite('threx_bomber', pos=pos)
         ship.radius = 30
         ship.speed = 150
-        ship.health = 40
+        ship.health = 40 + ship_plan['strength'] // 5 * 10
         ship.weapon_interval = 1.0
         ship.turn_rate = 1.0
         ports = cycle([vec2(10, -25), vec2(10, 25)])

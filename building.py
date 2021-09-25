@@ -607,9 +607,9 @@ class RepairBay(Building):
                 )
 
                 if sep.is_zero():
-                    dest = self.pos + random_ring(100)
+                    dest = self.pos + random_ring(66)
                 else:
-                    dest = target.pos - sep.safe_scaled_to(100)
+                    dest = target.pos - sep.safe_scaled_to(66)
 
                 async def go_to(dest):
                     sep = dest - drone.pos
@@ -628,17 +628,17 @@ class RepairBay(Building):
                 async def heal():
                     sep = target.pos - drone.pos
                     effects.pixels.emit(
-                        20,
+                        10,
                         pos=drone.pos,
-                        vel=sep.safe_scaled_to(60),
+                        vel=sep.safe_scaled_to(-100),
                         age_spread=0.1,
-                        vel_spread=20,
-                        size=2,
-                        color=(0, 1, 0, 0.4),
+                        vel_spread=50,
+                        size=1,
+                        color=(1, 1, 0.9, 0.4),
                     )
-                    light = effects.mklight(pos=drone.pos, color=(0, 1, 0, 0.4))
-                    light.scale = 2
-                    target.health = min(target.health + 5, type(target).health)
+                    light = effects.mklight(pos=drone.pos, color=(1, 1, 0.9, 1.0))
+                    light.scale = 1.5
+                    target.health = min(target.health + 2, type(target).health)
                     with showing(light):
                         await animate(light, duration=0.4, scale=0.1)
 
@@ -651,7 +651,7 @@ class RepairBay(Building):
                     if target.health < 0:
                         break
                     await heal()
-                    new_pos = target.pos + random_ring(100)
+                    new_pos = target.pos + random_ring(66)
 
                 await go_to(self.pos)
                 await self.open_iris()
