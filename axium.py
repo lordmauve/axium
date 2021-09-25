@@ -260,6 +260,7 @@ async def threx_bomb(ship, offset):
 async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
     """Coroutine to run an enemy ship."""
 
+    trailpos = vec2(-10, 0)
     if ship_plan['type'] == 'fighter':
         ship = scene.layers[0].add_sprite('threx', pos=pos)
         ship.radius = 14
@@ -267,6 +268,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         ship.weapon_interval = 1.0
         ship.health = 10
         ship.turn_rate = 3.0
+        trailpos = vec2(-6, 0)
 
         def weapon_func():
             bullet_nursery.do(threx_shoot(ship))
@@ -322,7 +324,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
             ship.nursery = ns
             ns.do(ai.reconsider_target(ship))
             ns.do(getattr(ai, ship.plan['ai'])(ship, weapon_func))
-            ns.do(effects.trail(ship, color='red', stroke_width=1))
+            ns.do(effects.trail(ship, color='red', stroke_width=1, relpos=trailpos))
 
     if ship_plan['type'] == 'bomber':
         effects.explode(ship.pos, vec2(0, 0))

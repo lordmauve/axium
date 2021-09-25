@@ -125,7 +125,7 @@ def explode(pos, vel):
         game.do(trail())
 
 
-async def trail(obj, color='white', stroke_width=2):
+async def trail(obj, color='white', stroke_width=2, relpos=vec2(-10, 0)):
     trail = scene.layers[1].add_line(
         [obj.pos] * 50,
         color=color,
@@ -139,7 +139,7 @@ async def trail(obj, color='white', stroke_width=2):
     with showing(trail):
         t = 0
         async for dt in coro.frames_dt():
-            stern = obj.pos + vec2(-10, 0).rotated(obj.angle)
+            stern = obj.pos + relpos.rotated(obj.angle)
             verts = trail.vertices
             verts[0] = stern
             t += dt
