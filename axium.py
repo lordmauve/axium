@@ -440,6 +440,12 @@ async def do_life(player):
                 mark.anim.stop()
                 mark.delete()
 
+    async def pause_button():
+        while True:
+            await controller.button_press('start')
+            clocks.game.paused = not clocks.game.paused
+            sfx.pause.play()
+
     with colgroup.tracking(ship, 'ship'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
@@ -448,16 +454,15 @@ async def do_life(player):
             ns.do(effects.trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
             ns.do(radar())
             ns.do(boost())
+            ns.do(pause_button())
     targets.remove(ship)
 
 
 async def screenshot(controller):
-    """Take screenshots when the player presses the Start button."""
-    button = 11
+    """Take screenshots when the player presses the Select button."""
     while True:
-        await controller.button_press('start')
+        await controller.button_press('select')
         scene.screenshot()
-        await controller.button_release('start')
 
 
 async def collisions():
@@ -509,9 +514,9 @@ async def show_title(text):
         color=(0, 0, 0, 0)
     )
     label.scale = 0.2
-    await animate(label, duration=0.3, scale=1.0, y=200, color=(1, 1, 1, 1))
+    await clocks.ui.animate(label, duration=0.3, scale=1.0, y=200, color=(1, 1, 1, 1))
     yield
-    await animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=0)
+    await clocks.ui.animate(label, duration=0.5, color=(0, 0, 0, 0), scale=5, y=0)
     label.delete()
 
 

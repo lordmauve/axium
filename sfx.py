@@ -120,6 +120,17 @@ phaser = Sound(buffer=pyfxr.SFX(
 phaser.set_volume(0.2)
 
 
+pause = Sound(buffer=pyfxr.SFX(
+    base_freq=0.5,
+    env_attack=0.0,
+    env_sustain=0.29,
+    env_decay=0.193,
+    env_punch=0.473,
+    arp_speed=0.58,
+    arp_mod=-0.18,
+))
+pause.set_volume(0.3)
+
 impacts = [
     Sound(buffer=pyfxr.SFX(
         base_freq=0.44 + i * 0.03,
