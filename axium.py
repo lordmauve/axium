@@ -397,19 +397,22 @@ async def do_life(player):
     async def radar():
         tracked = {}
         transparent = (0, 0, 0, 0)
+        blue = (0.6, 0.6, 1.0, 1.0)
         try:
             async for _ in coro.frames_dt():
-                current_threx = colgroup.by_type['threx']
-                new_threx = current_threx - tracked.keys()
-                for target in new_threx:
+                objects = {(t, 'red') for t in colgroup.by_type['threx']}
+                objects |= {(t, blue) for t in colgroup.by_type['building']}
+
+                new_objects = objects - tracked.keys()
+                for target in new_objects:
                     mark = tracked[target] = radar_layer.add_sprite(
                         'radarmark',
                         color=transparent,
                         scale=3.0
                     )
                     mark.anim = w2d.animate(mark, duration=0.5, scale=1.0)
-                dead_threx = tracked.keys() - current_threx
-                for t in dead_threx:
+                dead_objects = tracked.keys() - objects
+                for t in dead_objects:
                     mark.anim.stop()
                     tracked.pop(t).delete()
                 center = viewport.camera.pos
@@ -418,10 +421,10 @@ async def do_life(player):
                 vpradius = min(viewport.dims) // 2 - 30
                 vpcenter = viewport.center
 
-                for target, mark in tracked.items():
+                for (target, color), mark in tracked.items():
                     off = target.pos - center
                     onscreen = vprect.collidepoint(target.pos)
-                    mark.color = transparent if onscreen else 'red'
+                    mark.color = transparent if onscreen else color
                     mark.pos = vpcenter + off.safe_scaled_to(vpradius)
                     mark.angle = off.angle()
         finally:
