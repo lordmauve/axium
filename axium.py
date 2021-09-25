@@ -213,9 +213,14 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
     """Coroutine to run an enemy ship."""
     ship = scene.layers[0].add_sprite('threx', pos=pos)
     ship.radius = 14
-    ship.vel = vec2(250, 0)
+    ship.speed = 250
+    ship.vel = vec2(ship.speed, 0)
     ship.rudder = 0
     ship.plan = ship_plan
+    ship.weapon_interval = 1.0
+
+    if not ship.plan['group_aware']:
+        groupctx = ai.Group()
     ship.groupctx = groupctx
 
     def weapon_func(direction=None):
@@ -226,9 +231,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(ai.reconsider_target(ship))
-            ns.do(ai.drive(ship))
-            ns.do(ai.steer(ship))
-            ns.do(ai.shoot(ship, weapon_func))
+            ns.do(getattr(ai, ship.plan['ai'])(ship, weapon_func))
             ns.do(effects.trail(ship, color='red', stroke_width=1))
 
 
@@ -443,11 +446,13 @@ class Player:
 
 
 class Balance:
-    def __init__(self, value=100000):
-        self._value = self._display_value = value
+    INITIAL_BALANCE = 0
+
+    def __init__(self, value=None):
+        self._value = self._display_value = value or self.INITIAL_BALANCE
         self.sprite = w2d.Group([
                 hud.add_label(
-                    str(int(value)),
+                    str(int(self._value)),
                     font='sector_034',
                     align="right",
                     fontsize=20,
@@ -609,6 +614,14 @@ async def title():
 
 
 async def main():
+    from argparse import ArgumentParser
+    p = ArgumentParser()
+    p.add_argument('--wave', type=int, help="Wave to start with", default=1)
+    p.add_argument('--cash', type=int, help="Start with extra cash", default=0)
+    args = p.parse_args()
+
+    Balance.INITIAL_BALANCE = args.cash or 0
+
     global game
     async with w2d.Nursery() as services:
         services.do(controllers.hotplug())
@@ -619,7 +632,18 @@ async def main():
                 game.do(play_game(game))
                 game.do(screenshot(controllers.sticks[0]))
                 game.do(collisions())
-                for wave_num in count(1):
+                if args.wave != 1:
+                    # FIXME: this causes a crash for some reason?
+                    # File "wasabi2d/primitives/text.py", line 34, in render
+                    #     self.tex.use(0)
+                    #   File "moderngl/texture.py", line 403, in use
+                    #     self.mglo.use(location)
+                    # AttributeError: 'mgl.InvalidObject' object has no attribute 'use'
+                    #
+                    # async with title("Get ready!"):
+                    #     await coro.sleep(20)
+                    await coro.sleep(20)
+                for wave_num in count(args.wave):
                     await wave(wave_num)
         services.cancel()
 

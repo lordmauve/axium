@@ -52,6 +52,11 @@ TYPE_COSTS = [
     ('bomber', 5),  # Slow ship but with strong health
 ]
 
+GROUP_COSTS = [
+    (False, 1),  # Don't coordinate attacks
+    (True, 2),  # Coordinate attacks with the rest of the group
+]
+
 
 def combos(*criteria):
     """Return all combinations of the given criteria and their cost."""
@@ -60,7 +65,7 @@ def combos(*criteria):
         yield np.product(costs), choices
 
 
-ALL_TYPES = sorted(combos(AI_COSTS, TYPE_COSTS))
+ALL_TYPES = sorted(combos(AI_COSTS, TYPE_COSTS, GROUP_COSTS))
 
 
 def plan_ship(strength, seed):
@@ -77,10 +82,11 @@ def plan_ship(strength, seed):
         matches.append(ALL_TYPES[idx])
         idx -= 1
 
-    ship_strength, (ai, type) = rng.choice(matches)
+    ship_strength, (ai, type, group_aware) = rng.choice(matches)
     return {
         'ai': ai,
         'type': type,
+        'group_aware': group_aware,
         'strength': ship_strength,
         'target_strength': strength,
     }

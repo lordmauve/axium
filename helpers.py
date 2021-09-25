@@ -20,7 +20,11 @@ def random_ring(r) -> vec2:
 
 
 def angle_to(target, from_obj) -> float:
-    sep = target.pos - from_obj.pos
+    return angle_to_pos(target.pos, from_obj)
+
+
+def angle_to_pos(pos, from_obj) -> float:
+    sep = pos - from_obj.pos
     r = (sep.angle() - from_obj.angle) % tau
     if r > pi:
         r -= tau

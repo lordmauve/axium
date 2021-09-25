@@ -10,7 +10,7 @@ from wasabigeom import vec2
 import random
 
 import sfx
-from helpers import random_vec2, showing, random_ring
+from helpers import random_vec2, showing, random_ring, angle_to_pos
 from collisions import colgroup
 import clocks
 from clocks import coro, animate
@@ -614,12 +614,16 @@ class RepairBay(Building):
                 async def go_to(dest):
                     sep = dest - drone.pos
                     time = sep.length() / DRONE_SPEED
+                    if time < 0.01:
+                        return
                     await face(dest)
                     await animate(drone, tween='accel_decel', pos=dest, duration=time)
 
                 async def face(dest):
-                    sep = dest - drone.pos
-                    await animate(drone, duration=0.1, angle=sep.angle())
+                    angle = angle_to_pos(dest, drone.pos)
+                    if abs(angle) < 0.02:
+                        return
+                    await animate(drone, duration=0.1, angle=drone.angle + angle)
 
                 async def heal():
                     sep = target.pos - drone.pos

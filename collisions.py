@@ -18,6 +18,7 @@ class CollisionGroup:
     def add_handler(self, type_a: str, type_b: str, func):
         """Register an object"""
         self.handlers[type_a, type_b] = func
+        self.handlers[type_b, type_a] = lambda b, a: func(a, b)
         self.by_type.setdefault(type_a, set())
         self.by_type.setdefault(type_b, set())
 
@@ -124,11 +125,6 @@ class CollisionGroup:
             handler = self.handlers.get(types)
             if handler:
                 handler(a, b)
-                continue
-
-            handler = self.handlers.get(types[::-1])
-            if handler:
-                handler(b, a)
 
     def choose_random(self, type):
         """Choose a random object of the given type."""

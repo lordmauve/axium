@@ -2,11 +2,13 @@ import random
 from contextlib import contextmanager
 import operator
 
+import wasabi2d as w2d
 from wasabigeom import vec2
 
 from collisions import colgroup
 from clocks import coro, animate
-from helpers import angle_to
+from helpers import angle_to, random_ring
+import effects
 
 
 class NullTarget:
@@ -15,6 +17,7 @@ class NullTarget:
     Causes enemies to head towards the world origin.
     """
     pos = vec2(0, 0)
+    radius = 1
 
     def __bool__(self):
         return False
@@ -143,5 +146,82 @@ async def shoot(ship, fire_weapon):
             if dist < attack_range and abs(angle_to(target, ship)) < 0.2:
                 break
             await coro.sleep(0.1)
+        if target is NULL_TARGET:
+            await coro.sleep(1)
+            continue
         fire_weapon()
-        await coro.sleep(1)
+        await weapon_cooldown(ship)
+
+
+async def drive_kamikaze(ship):
+    async for dt in coro.frames_dt():
+        target = ship.target
+        sep = target.pos - ship.pos
+        if target is not NULL_TARGET \
+            and sep.length_squared() < target.radius ** 2 + ship.radius ** 2:
+            break
+        ship.angle = sep.angle()
+        ship.vel = sep.scaled_to(ship.speed)
+        ship.pos += ship.vel * dt
+
+    effects.explode(ship.pos, ship.vel * 0.2)
+    damage = {
+        'fighter': 30,
+        'interceptor': 50,
+        'bomber': 120,
+    }
+    target.hit(damage[ship.plan['type']])
+
+
+
+async def attack(ship, weapon_func):
+    async with w2d.Nursery() as ns:
+        ns.do(drive(ship))
+        ns.do(steer(ship))
+        ns.do(shoot(ship, weapon_func))
+
+
+sniper = attack
+
+
+async def kamikaze(ship, weapon_func):
+    ship.speed *= 1.3
+    ship.vel *= 1.3
+    async with w2d.Nursery() as ns:
+        ns.do(drive_kamikaze(ship))
+        ns.do(shoot(ship, weapon_func))
+
+
+async def weapon_cooldown(ship):
+    await coro.sleep(ship.weapon_interval)
+
+
+async def zapper(ship, weapon_func):
+    target = ship.target
+
+    # Zappers can fire faster
+    ship.weapon_interval *= 0.7
+
+    async def move_to_firing_pos():
+        async for dt in coro.frames_dt():
+            if ship.target is not target:
+                return False
+            firing_pos = target.pos - (target.pos - ship.pos).scaled_to(200)
+
+            sep = firing_pos - ship.pos
+            if sep.length_squared() < 50:
+                return True
+            ship.angle = sep.angle()
+            ship.vel = sep.scaled_to(ship.speed)
+            ship.pos += ship.vel * dt
+
+    while True:
+        target = ship.target
+        if not await move_to_firing_pos():
+            continue
+
+        sep = target.pos - ship.pos
+        await animate(ship, duration=0.1, angle=sep.angle())
+        while ship.target is target:
+            weapon_func()
+            await weapon_cooldown(ship)
