@@ -1,9 +1,7 @@
-from hashlib import sha256
 import wasabi2d as w2d
 from wasabigeom import vec2
 import numpy as np
 import pygame
-from pygame import joystick
 import pygame.mixer
 import random
 from math import tau, pi, sin, cos
@@ -13,14 +11,14 @@ from dataclasses import dataclass
 
 import sfx
 import building
-from helpers import showing, random_ring
+from helpers import showing, random_ring, angle_to
 from collisions import colgroup
 import controllers
 from clocks import coro, animate
 import clocks
 import effects
 import waves
-
+import ai
 
 # Ship deceleration
 DECEL = 0.01
@@ -184,33 +182,12 @@ async def rocket(ship):
     effects.explode(shot.pos, vec2(0, 0))
 
 
-async def trail(obj, color='white', stroke_width=2):
-    trail = scene.layers[1].add_line(
-        [obj.pos] * 50,
-        color=color,
-        stroke_width=stroke_width,
-    )
-    *_, alpha = trail.color
-    colors = trail.colors
-    colors[:, 3] = np.linspace(alpha, 0, 50) ** 2
-    trail.colors = colors
-
-    with showing(trail):
-        t = 0
-        async for dt in coro.frames_dt():
-            stern = obj.pos + vec2(-10, 0).rotated(obj.angle)
-            verts = trail.vertices
-            verts[0] = stern
-            t += dt
-            if t > 1 / 60:
-                verts[1:] = verts[:-1]
-                t %= 1 / 60
-            trail.vertices = verts
-
-
-async def threx_shoot(ship):
+async def threx_shoot(ship, direction=None):
     sfx.enemy_laser.play()
-    vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
+    if direction is not None:
+        vel = direction.scaled_to(BULLET_SPEED) + ship.vel
+    else:
+        vel = vec2(BULLET_SPEED, 0).rotated(ship.angle) + ship.vel
     pos = ship.pos + vec2(20, 0).rotated(ship.angle)
     shot = w2d.Group(
         [
@@ -232,76 +209,27 @@ async def threx_shoot(ship):
             shot[1].angle -= 2 * dt
 
 
-def angle_to(target, from_obj) -> float:
-    sep = target.pos - from_obj.pos
-    r = (sep.angle() - from_obj.angle) % tau
-    if r > pi:
-        r -= tau
-    return r
-
-
-async def do_threx(bullet_nursery, pos):
+async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
     """Coroutine to run an enemy ship."""
     ship = scene.layers[0].add_sprite('threx', pos=pos)
     ship.radius = 14
     ship.vel = vec2(250, 0)
     ship.rudder = 0
+    ship.plan = ship_plan
+    ship.groupctx = groupctx
 
-    target = None
+    def weapon_func(direction=None):
+        bullet_nursery.do(threx_shoot(ship, direction))
 
-    def pick_target():
-        nonlocal target
-        if random.randrange(5) > 0 and building.base.objects:
-            target = random.choice(building.base.objects)
-        else:
-            target = random.choice(list(targets))
-
-    pick_target()
-
-    async def drive():
-        turn_rate = 3.0
-
-        async for dt in coro.frames_dt():
-            ship.vel = ship.vel.rotated(ship.rudder * turn_rate * dt)
-
-            ship.pos += ship.vel * dt
-            ship.angle = ship.vel.angle()
-            cam = scene.camera.pos
-            off = (ship.pos - cam)
-
-    async def steer():
-        async for dt in coro.frames_dt():
-            r = angle_to(target, ship)
-
-            if r > 1e-2:
-                ship.rudder = 1
-            elif r < -1e-2:
-                ship.rudder = -1
-            else:
-                ship.rudder = 0
-
-            sep = target.pos - ship.pos
-            if sep.length() < 100 + target.radius:
-                ship.rudder = random.choice((1, -1))
-                await coro.sleep(0.2)
-
-    async def shoot():
-        while True:
-            async for dt in coro.frames_dt():
-                dist = (target.pos - ship.pos).length()
-                if dist < 500 and abs(angle_to(target, ship)) < 0.2:
-                    break
-                await coro.sleep(0.1)
-            bullet_nursery.do(threx_shoot(ship))
-            await coro.sleep(1)
-
+    ai.pick_target(ship)
     with colgroup.tracking(ship, 'threx'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
-            ns.do(drive())
-            ns.do(steer())
-            ns.do(shoot())
-            ns.do(trail(ship, color='red', stroke_width=1))
+            ns.do(ai.reconsider_target(ship))
+            ns.do(ai.drive(ship))
+            ns.do(ai.steer(ship))
+            ns.do(ai.shoot(ship, weapon_func))
+            ns.do(effects.trail(ship, color='red', stroke_width=1))
 
 
 async def do_life(player):
@@ -406,13 +334,12 @@ async def do_life(player):
                 mark.anim.stop()
                 mark.delete()
 
-
     with colgroup.tracking(ship, 'ship'), showing(ship):
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(drive_ship())
             ns.do(shoot())
-            ns.do(trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
+            ns.do(effects.trail(ship, color=(0.6, 0.8, 1.0, 0.9)))
             ns.do(radar())
             ns.do(boost())
     targets.remove(ship)
@@ -490,11 +417,11 @@ async def wave(wave_num):
 
     async with w2d.Nursery() as ns:
         groups = waves.plan_ships_of_wave(wave_num)
-        for group in groups:
+        for plan, groupctx in zip(groups, ai.mkgroups(len(groups))):
             group_center = random_ring(1500)
-            for ship_plan in group:
+            for ship_plan in plan:
                 pos = group_center + random_ring(100)
-                ns.do(do_threx(game, pos))
+                ns.do(do_threx(game, pos, ship_plan, groupctx))
     await slowmo()
 
 

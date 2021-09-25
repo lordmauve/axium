@@ -1,5 +1,6 @@
 import random
 
+import numpy as np
 import wasabi2d as w2d
 from wasabi2d.primitives.particles import ParticleGroup
 from wasabigeom import vec2
@@ -121,3 +122,27 @@ def explode(pos, vel):
 
     for _ in range(random.randint(2, 4)):
         game.do(trail())
+
+
+async def trail(obj, color='white', stroke_width=2):
+    trail = scene.layers[1].add_line(
+        [obj.pos] * 50,
+        color=color,
+        stroke_width=stroke_width,
+    )
+    *_, alpha = trail.color
+    colors = trail.colors
+    colors[:, 3] = np.linspace(alpha, 0, 50) ** 2
+    trail.colors = colors
+
+    with showing(trail):
+        t = 0
+        async for dt in coro.frames_dt():
+            stern = obj.pos + vec2(-10, 0).rotated(obj.angle)
+            verts = trail.vertices
+            verts[0] = stern
+            t += dt
+            if t > 1 / 60:
+                verts[1:] = verts[:-1]
+                t %= 1 / 60
+            trail.vertices = verts

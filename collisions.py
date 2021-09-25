@@ -2,6 +2,7 @@ from functools import partial
 from itertools import combinations
 from typing import Iterable, Tuple
 from contextlib import contextmanager
+import random
 
 
 class CollisionGroup:
@@ -128,6 +129,10 @@ class CollisionGroup:
             handler = self.handlers.get(types[::-1])
             if handler:
                 handler(b, a)
+
+    def choose_random(self, type):
+        """Choose a random object of the given type."""
+        return random.choice(list(self.by_type[type]))
 
 
 colgroup = CollisionGroup()
