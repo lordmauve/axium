@@ -662,7 +662,7 @@ async def play_game(nursery):
                 hotplug.do(wait_for_p2())
 
     building.base.clear()
-
+    w2d.sounds.game_over.play()
     nursery.cancel()
 
 

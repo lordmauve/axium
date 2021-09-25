@@ -753,9 +753,13 @@ async def building_mode(ship, player, construction_ns):
                 pos, can_place = base.can_place(point)
                 if cost > player.balance.value:
                     # Speak
+                    w2d.sounds.insufficient_funds.play()
+                    ns.cancel()
                     continue
                 if not base.sufficient_power(cls):
                     # Speak
+                    w2d.sounds.insufficient_power.play()
+                    ns.cancel()
                     continue
                 if can_place:
                     player.balance.value -= cost
