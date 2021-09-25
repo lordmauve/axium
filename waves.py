@@ -13,8 +13,8 @@ def plan_group(strength, seed):
     """
     rng = default_rng(abs(hash(seed)))
 
-    if strength < 6:
-        ships = rng.integers(2, 4)
+    if strength < 12:
+        ships = strength // 4 + 1
     else:
         ships = 4
 
@@ -27,7 +27,7 @@ def plan_group(strength, seed):
 def plan_wave(wave_num):
     """Plan a wave at the given wave number."""
     strength = wave_num + 1
-    num_groups = max(1, min(4, strength // 3))
+    num_groups = max(1, min(4, strength // 6))
     strength_per_group, remainder = divmod(strength, num_groups)
 
     return [
@@ -109,17 +109,17 @@ def test_ship_type(n):
         'ai': ai,
         'type': type,
         'group_aware': False,
-        'score': score,
+        'strength': score,
     }
     print(f"{n}:", ship)
     return [[ship]]
 
 
 if __name__ == '__main__':
-    # for i in range(1, 101):
-    #     print(plan_wave(i))
+    for i in range(1, 101):
+        print(plan_wave(i))
 
     # for group in plan_ships_of_wave(29):
     #     print(group)
-    for strength in range(20):
-        print(plan_ship(strength, 0))
+    # for strength in range(20):
+    #     print(plan_ship(strength, 0))

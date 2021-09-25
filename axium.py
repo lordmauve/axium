@@ -316,7 +316,7 @@ async def do_threx(bullet_nursery, pos, ship_plan, groupctx):
     ship.groupctx = groupctx
 
     ai.pick_target(ship)
-    with colgroup.tracking(ship, 'threx'), showing(ship):
+    with colgroup.tracking(ship, 'threx'), showing(ship), groupctx.ship_alive():
         async with w2d.Nursery() as ns:
             ship.nursery = ns
             ns.do(ai.reconsider_target(ship))
@@ -587,7 +587,7 @@ class Balance:
 
 
 async def play_game(nursery):
-    lives = 3
+    lives = 5
 
     pos = vec2(20, 20)
     icons = [

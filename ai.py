@@ -4,6 +4,7 @@ import operator
 
 import wasabi2d as w2d
 from wasabigeom import vec2
+from math import pi
 
 from collisions import colgroup
 from clocks import coro, animate
@@ -32,14 +33,14 @@ class Group:
     Ships that don't coordinate can just create their own private group.
     """
 
-    def __init__(self, groups=frozenset()):
-        self.other_groups = groups
+    def __init__(self, groups=None):
+        self.other_groups = groups or set()
         self._base_target = None
         self._ship_target = None
         self.ships = 0
 
     @contextmanager
-    def ship_alive(self, ship):
+    def ship_alive(self):
         self.ships += 1
         try:
             yield
@@ -98,11 +99,15 @@ def mkgroups(num):
 
 def pick_target(ship):
     if ship.plan['ai'] in ('attack', 'sniper'):
-        ship.target = ship.groupctx.get_fighter_target(ship.pos)
-    else:
-        ship.target = ship.groupctx.get_base_target()
-        if ship.target is NULL_TARGET:
+        # Stronger ships are more likely to attack the player
+        fighter_chance = ship.plan['strength']
+        if random.randrange(fighter_chance + 6) < fighter_chance:
             ship.target = ship.groupctx.get_fighter_target(ship.pos)
+            return
+
+    ship.target = ship.groupctx.get_base_target()
+    if ship.target is NULL_TARGET:
+        ship.target = ship.groupctx.get_fighter_target(ship.pos)
 
 
 async def reconsider_target(ship):
@@ -124,12 +129,19 @@ async def steer(ship):
         target = ship.target
         r = angle_to(target, ship)
 
+        if abs(r) > pi / 2:
+            await coro.sleep(0.4)
+            r = angle_to(target, ship)
+
         if r > 1e-2:
             ship.rudder = 1
         elif r < -1e-2:
             ship.rudder = -1
         else:
             ship.rudder = 0
+
+        if abs(r) > pi / 2:
+            await coro.sleep(0.2)
 
         sep = target.pos - ship.pos
         if sep.length() < 100 + target.radius:
@@ -139,16 +151,26 @@ async def steer(ship):
 
 async def shoot(ship, fire_weapon):
     attack_range = 1000 if ship.plan['ai'] == 'sniper' else 400
+
+    # Trigger delay, decreases with level
+    trigger_delay = 1 / (1 + ship.plan['strength'])
+
+    # Accuracy, decreases with level
+    accuracy = 0.05 + 0.5 / (1 + ship.plan['strength'])
+
     while True:
         async for dt in coro.frames_dt():
             target = ship.target
             dist = (target.pos - ship.pos).length()
-            if dist < attack_range and abs(angle_to(target, ship)) < 0.2:
+            if dist < attack_range and abs(angle_to(target, ship)) < accuracy:
                 break
             await coro.sleep(0.1)
         if target is NULL_TARGET:
             await coro.sleep(1)
             continue
+
+        await coro.sleep(trigger_delay)
+
         fire_weapon()
         await weapon_cooldown(ship)
 
