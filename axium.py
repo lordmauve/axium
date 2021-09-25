@@ -19,6 +19,7 @@ import controllers
 from clocks import coro, animate
 import clocks
 import effects
+import waves
 
 
 # Ship deceleration
@@ -488,19 +489,12 @@ async def wave(wave_num):
             await sfx.play(sound)
 
     async with w2d.Nursery() as ns:
-        if wave_num < 4:
-            enemies = wave_num + 1
-        else:
-            enemies = min(wave_num // 2, 12)
-        groups = max(1, min(4, enemies // 3))
-        enemies_per_group = enemies / groups
-        spawned = 0
-        for i in range(groups):
+        groups = waves.plan_ships_of_wave(wave_num)
+        for group in groups:
             group_center = random_ring(1500)
-            while spawned < enemies_per_group * (i + 1):
+            for ship_plan in group:
                 pos = group_center + random_ring(100)
                 ns.do(do_threx(game, pos))
-                spawned += 1
     await slowmo()
 
 
@@ -522,7 +516,7 @@ class Player:
 
 
 class Balance:
-    def __init__(self, value=0):
+    def __init__(self, value=100000):
         self._value = self._display_value = value
         self.sprite = w2d.Group([
                 hud.add_label(
