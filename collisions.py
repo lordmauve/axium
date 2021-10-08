@@ -87,7 +87,7 @@ class CollisionGroup:
                 else:
                     if len(found) > 1:
                         yield from collisions_y(found)
-                    found = [o]
+                    found[:] = o,
                 mark = max(mark, right(o))
 
             n_found = len(found)
